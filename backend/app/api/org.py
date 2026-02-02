@@ -21,6 +21,26 @@ from app.schemas.org import (
 router = APIRouter(tags=["org"])
 
 
+def _enforce_employee_create_policy(
+    session: Session, *, actor_employee_id: int, target_employee_type: str
+) -> None:
+    """Enforce: agents can only create/provision agents; humans can create humans + agents."""
+
+    actor = session.get(Employee, actor_employee_id)
+    if actor is None:
+        # Actor header is required; if it points to nothing, treat as invalid.
+        raise HTTPException(status_code=400, detail="Actor employee not found")
+
+    target = (target_employee_type or "").lower()
+    actor_type = (actor.employee_type or "").lower()
+
+    if actor_type == "agent" and target != "agent":
+        raise HTTPException(
+            status_code=403,
+            detail="Agent employees may only create/provision agent employees",
+        )
+
+
 def _default_agent_prompt(emp: Employee) -> str:
     """Generate a conservative default prompt for a newly-created agent employee.
 
@@ -66,6 +86,11 @@ def _maybe_auto_provision_agent(session: Session, *, emp: Employee, actor_employ
     This is intentionally best-effort. If OpenClaw is not configured or the call fails,
     we leave the employee as-is (openclaw_session_key stays null).
     """
+
+    # Enforce: agent actors may only provision agents (humans can provision agents).
+    _enforce_employee_create_policy(
+        session, actor_employee_id=actor_employee_id, target_employee_type=emp.employee_type
+    )
 
     if emp.employee_type != "agent":
         return
@@ -297,6 +322,10 @@ def create_employee(
     session: Session = Depends(get_session),
     actor_employee_id: int = Depends(get_actor_employee_id),
 ):
+    _enforce_employee_create_policy(
+        session, actor_employee_id=actor_employee_id, target_employee_type=payload.employee_type
+    )
+
     emp = Employee(**payload.model_dump())
     session.add(emp)
 
