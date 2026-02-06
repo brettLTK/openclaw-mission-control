@@ -6,11 +6,13 @@ import { useParams, useRouter } from "next/navigation";
 import { SignInButton, SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
 import { Activity, MessageSquare, Pencil, Settings, X } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
 import { DashboardSidebar } from "@/components/organisms/DashboardSidebar";
 import { TaskBoard } from "@/components/organisms/TaskBoard";
 import { DashboardShell } from "@/components/templates/DashboardShell";
+import { BoardChatComposer } from "@/components/BoardChatComposer";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -201,7 +203,6 @@ export default function BoardDetailPage() {
   );
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<BoardChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
   const [isChatSending, setIsChatSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const chatMessagesRef = useRef<BoardChatMessage[]>([]);
@@ -235,10 +236,35 @@ export default function BoardDetailPage() {
   const [isSavingTask, setIsSavingTask] = useState(false);
   const [saveTaskError, setSaveTaskError] = useState<string | null>(null);
 
+  const isSidePanelOpen = isDetailOpen || isChatOpen || isLiveFeedOpen;
+
   const titleLabel = useMemo(
     () => (board ? `${board.name} board` : "Board"),
     [board],
   );
+
+  useEffect(() => {
+    if (!isSidePanelOpen) return;
+
+    const { body, documentElement } = document;
+    const originalHtmlOverflow = documentElement.style.overflow;
+    const originalBodyOverflow = body.style.overflow;
+    const originalBodyPaddingRight = body.style.paddingRight;
+
+    const scrollbarWidth = window.innerWidth - documentElement.clientWidth;
+
+    documentElement.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      documentElement.style.overflow = originalHtmlOverflow;
+      body.style.overflow = originalBodyOverflow;
+      body.style.paddingRight = originalBodyPaddingRight;
+    };
+  }, [isSidePanelOpen]);
 
   const latestTaskTimestamp = (items: Task[]) => {
     let latestTime = 0;
@@ -889,10 +915,10 @@ export default function BoardDetailPage() {
     }
   };
 
-  const handleSendChat = async () => {
-    if (!isSignedIn || !boardId) return;
-    const trimmed = chatInput.trim();
-    if (!trimmed) return;
+  const handleSendChat = useCallback(async (content: string): Promise<boolean> => {
+    if (!isSignedIn || !boardId) return false;
+    const trimmed = content.trim();
+    if (!trimmed) return false;
     setIsChatSending(true);
     setChatError(null);
     try {
@@ -917,15 +943,16 @@ export default function BoardDetailPage() {
           return next;
         });
       }
-      setChatInput("");
+      return true;
     } catch (err) {
       setChatError(
         err instanceof Error ? err.message : "Unable to send message.",
       );
+      return false;
     } finally {
       setIsChatSending(false);
     }
-  };
+  }, [boardId, isSignedIn]);
 
   const assigneeById = useMemo(() => {
     const map = new Map<string, string>();
@@ -1444,14 +1471,16 @@ export default function BoardDetailPage() {
       </SignedOut>
       <SignedIn>
         <DashboardSidebar />
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 to-slate-100">
+        <main
+          className={cn(
+            "flex-1 bg-gradient-to-br from-slate-50 to-slate-100",
+            isSidePanelOpen ? "overflow-hidden" : "overflow-y-auto",
+          )}
+        >
           <div className="sticky top-0 z-30 border-b border-slate-200 bg-white shadow-sm">
             <div className="px-8 py-6">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    <span>{board?.name ?? "Board"}</span>
-                  </div>
                   <h1 className="mt-2 text-2xl font-semibold text-slate-900 tracking-tight">
                     {board?.name ?? "Board"}
                   </h1>
@@ -1724,7 +1753,7 @@ export default function BoardDetailPage() {
       ) : null}
       <aside
         className={cn(
-          "fixed right-0 top-0 z-50 h-full w-[760px] max-w-[99vw] transform bg-white shadow-2xl transition-transform",
+          "fixed right-0 top-0 z-50 h-full w-[max(760px,45vw)] max-w-[99vw] transform bg-white shadow-2xl transition-transform",
           isDetailOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
@@ -1949,26 +1978,26 @@ export default function BoardDetailPage() {
                         <span>{formatCommentTimestamp(comment.created_at)}</span>
                       </div>
                       {comment.message?.trim() ? (
-                        <div className="mt-2 text-sm text-slate-900 whitespace-pre-wrap break-words">
+                        <div className="mt-2 select-text cursor-text text-sm text-slate-900 break-words">
                           <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
+                            remarkPlugins={[remarkGfm, remarkBreaks]}
                             components={{
                               ...MARKDOWN_TABLE_COMPONENTS,
                               p: ({ node: _node, ...props }) => (
                                 <p
-                                  className="text-sm text-slate-900 whitespace-pre-wrap break-words"
+                                  className="text-sm text-slate-900 break-words"
                                   {...props}
                                 />
                               ),
                               ul: ({ node: _node, ...props }) => (
                                 <ul
-                                  className="list-disc pl-5 text-sm text-slate-900 whitespace-pre-wrap break-words"
+                                  className="list-disc pl-5 text-sm text-slate-900 break-words"
                                   {...props}
                                 />
                               ),
                               li: ({ node: _node, ...props }) => (
                                 <li
-                                  className="mb-1 text-sm text-slate-900 whitespace-pre-wrap break-words"
+                                  className="mb-1 text-sm text-slate-900 break-words"
                                   {...props}
                                 />
                               ),
@@ -2021,10 +2050,10 @@ export default function BoardDetailPage() {
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="flex flex-1 flex-col overflow-hidden px-6 py-4">
-            <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4">
-              {chatError ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+	          <div className="flex flex-1 flex-col overflow-hidden px-6 py-4">
+	            <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4">
+	              {chatError ? (
+	                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   {chatError}
                 </div>
               ) : null}
@@ -2070,37 +2099,13 @@ export default function BoardDetailPage() {
                     </div>
                   </div>
                 ))
-              )}
-              <div ref={chatEndRef} />
-            </div>
-            <div className="mt-4 space-y-2">
-              <Textarea
-                value={chatInput}
-                onChange={(event) => setChatInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
-                  if (event.nativeEvent.isComposing) return;
-                  if (event.shiftKey) return;
-                  event.preventDefault();
-                  if (isChatSending) return;
-                  if (!chatInput.trim()) return;
-                  void handleSendChat();
-                }}
-                placeholder="Message the board lead. Tag agents with @name."
-                className="min-h-[120px]"
-              />
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleSendChat}
-                  disabled={isChatSending || !chatInput.trim()}
-                >
-                  {isChatSending ? "Sending…" : "Send"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
+	              )}
+	              <div ref={chatEndRef} />
+	            </div>
+	            <BoardChatComposer isSending={isChatSending} onSend={handleSendChat} />
+	          </div>
+	        </div>
+	      </aside>
 
       <aside
         className={cn(
