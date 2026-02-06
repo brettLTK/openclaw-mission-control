@@ -50,7 +50,4 @@ jobs:
         env:
           # Keep CI builds deterministic and secretless.
           NEXT_TELEMETRY_DISABLED: "1"
-          # Clerk is required at Next build/prerender time in this repo.
-          # Use a dummy publishable key so forks/PRs can still validate.
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_00000000000000000000000000000000"
         run: make check
