@@ -2066,6 +2066,15 @@ export default function BoardDetailPage() {
               <Textarea
                 value={chatInput}
                 onChange={(event) => setChatInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  if (event.nativeEvent.isComposing) return;
+                  if (event.shiftKey) return;
+                  event.preventDefault();
+                  if (isChatSending) return;
+                  if (!chatInput.trim()) return;
+                  void handleSendChat();
+                }}
                 placeholder="Message the board lead. Tag agents with @name."
                 className="min-h-[120px]"
               />

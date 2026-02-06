@@ -20,7 +20,7 @@ from app.models.agents import Agent
 from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.models.tasks import Task
-from app.schemas.agents import AgentCreate, AgentHeartbeatCreate, AgentNudge, AgentRead
+from app.schemas.agents import AgentCreate, AgentHeartbeat, AgentHeartbeatCreate, AgentNudge, AgentRead
 from app.schemas.approvals import ApprovalCreate, ApprovalRead
 from app.schemas.board_memory import BoardMemoryCreate, BoardMemoryRead
 from app.schemas.board_onboarding import BoardOnboardingRead
@@ -376,14 +376,10 @@ async def agent_heartbeat(
     session: Session = Depends(get_session),
     agent_ctx: AgentAuthContext = Depends(get_agent_auth_context),
 ) -> AgentRead:
-    if agent_ctx.agent.name != payload.name:
-        payload = AgentHeartbeatCreate(
-            name=agent_ctx.agent.name,
-            status=payload.status,
-            board_id=payload.board_id,
-        )
-    return await agents_api.heartbeat_or_create_agent(  # type: ignore[attr-defined]
-        payload=payload,
+    # Heartbeats must apply to the authenticated agent; agent names are not unique.
+    return agents_api.heartbeat_agent(  # type: ignore[attr-defined]
+        agent_id=str(agent_ctx.agent.id),
+        payload=AgentHeartbeat(status=payload.status),
         session=session,
         actor=_actor(agent_ctx),
     )

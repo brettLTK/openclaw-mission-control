@@ -588,7 +588,7 @@ def heartbeat_agent(
     payload: AgentHeartbeat,
     session: Session = Depends(get_session),
     actor: ActorContext = Depends(require_admin_or_agent),
-) -> Agent:
+) -> AgentRead:
     agent = session.get(Agent, agent_id)
     if agent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -613,8 +613,20 @@ async def heartbeat_or_create_agent(
     payload: AgentHeartbeatCreate,
     session: Session = Depends(get_session),
     actor: ActorContext = Depends(require_admin_or_agent),
-) -> Agent:
-    agent = session.exec(select(Agent).where(Agent.name == payload.name)).first()
+) -> AgentRead:
+    # Agent tokens must heartbeat their authenticated agent record. Names are not unique.
+    if actor.actor_type == "agent" and actor.agent:
+        return heartbeat_agent(
+            agent_id=str(actor.agent.id),
+            payload=AgentHeartbeat(status=payload.status),
+            session=session,
+            actor=actor,
+        )
+
+    statement = select(Agent).where(Agent.name == payload.name)
+    if payload.board_id is not None:
+        statement = statement.where(Agent.board_id == payload.board_id)
+    agent = session.exec(statement).first()
     if agent is None:
         if actor.actor_type == "agent":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)

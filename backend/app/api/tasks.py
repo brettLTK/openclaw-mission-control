@@ -544,6 +544,20 @@ def update_task(
         )
         session.commit()
         session.refresh(task)
+
+        if task.assigned_agent_id and task.assigned_agent_id != previous_assigned:
+            if actor.actor_type == "agent" and actor.agent and task.assigned_agent_id == actor.agent.id:
+                return task
+            assigned_agent = session.get(Agent, task.assigned_agent_id)
+            if assigned_agent:
+                board = session.get(Board, task.board_id) if task.board_id else None
+                if board:
+                    _notify_agent_on_task_assign(
+                        session=session,
+                        board=board,
+                        task=task,
+                        agent=assigned_agent,
+                    )
         return task
     if actor.actor_type == "agent":
         if actor.agent and actor.agent.board_id and task.board_id:

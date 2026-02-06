@@ -202,9 +202,9 @@ export function BoardOnboardingChat({
 
   const submitAnswer = useCallback(() => {
     const trimmedOther = otherText.trim();
+    if (selectedOptions.length === 0 && !trimmedOther) return;
     const answer =
       selectedOptions.length > 0 ? selectedOptions.join(", ") : "Other";
-    if (!answer && !trimmedOther) return;
     void handleAnswer(answer, trimmedOther || undefined);
   }, [handleAnswer, otherText, selectedOptions]);
 
@@ -294,6 +294,12 @@ export function BoardOnboardingChat({
               placeholder="Other..."
               value={otherText}
               onChange={(event) => setOtherText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                if (loading) return;
+                submitAnswer();
+              }}
             />
             <Button
               variant="outline"
