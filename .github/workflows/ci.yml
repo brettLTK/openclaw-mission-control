@@ -122,7 +122,10 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
           # Cypress exposes env vars prefixed with CYPRESS_ via Cypress.env().
-          CYPRESS_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          # Vars for shared Clerk OTP helper (frontend/cypress/support/commands.ts)
+          CYPRESS_CLERK_ORIGIN: ${{ vars.CYPRESS_CLERK_ORIGIN }}
+          CYPRESS_CLERK_TEST_EMAIL: ${{ vars.CYPRESS_CLERK_TEST_EMAIL }}
+          CYPRESS_CLERK_TEST_OTP: ${{ vars.CYPRESS_CLERK_TEST_OTP }}
           # Also set for the app itself.
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
         run: |
