@@ -70,9 +70,22 @@ frontend-typecheck: ## Typecheck frontend (tsc)
 .PHONY: test
 test: backend-test ## Run tests
 
+.PHONY: coverage
+coverage: backend-coverage ## Run tests with coverage + enforce thresholds
+
 .PHONY: backend-test
 backend-test: ## Backend tests (pytest)
 	cd $(BACKEND_DIR) && uv run pytest
+
+.PHONY: backend-coverage
+backend-coverage: ## Backend tests with coverage (fail under 100% statements+branches on covered src)
+	cd $(BACKEND_DIR) && uv run pytest \
+		--cov=app \
+		--cov-config=.coveragerc \
+		--cov-report=term-missing \
+		--cov-report=xml:coverage.xml \
+		--cov-branch \
+		--cov-fail-under=100
 
 .PHONY: backend-migrate
 backend-migrate: ## Apply backend DB migrations (alembic upgrade head)
@@ -95,4 +108,4 @@ backend-templates-sync: ## Sync templates to existing gateway agents (usage: mak
 	cd $(BACKEND_DIR) && uv run python scripts/sync_gateway_templates.py --gateway-id "$(GATEWAY_ID)" $(SYNC_ARGS)
 
 .PHONY: check
-check: lint typecheck test build ## Run lint + typecheck + tests + build
+check: lint typecheck coverage build ## Run lint + typecheck + tests(with coverage gate) + build
