@@ -5,7 +5,7 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, func, update
+from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -14,7 +14,6 @@ from app.core.time import utcnow
 from app.db import crud
 from app.db.pagination import paginate
 from app.db.session import get_session
-from app.db.sqlmodel_exec import exec_dml
 from app.models.agents import Agent
 from app.models.board_group_memory import BoardGroupMemory
 from app.models.board_groups import BoardGroup
@@ -276,14 +275,16 @@ async def delete_board_group(
     await _require_group_access(session, group_id=group_id, member=ctx.member, write=True)
 
     # Boards reference groups, so clear the FK first to keep deletes simple.
-    await exec_dml(
+    await crud.update_where(
         session,
-        update(Board).where(col(Board.board_group_id) == group_id).values(board_group_id=None),
+        Board,
+        col(Board.board_group_id) == group_id,
+        board_group_id=None,
+        commit=False,
     )
-    await exec_dml(
-        session,
-        delete(BoardGroupMemory).where(col(BoardGroupMemory.board_group_id) == group_id),
+    await crud.delete_where(
+        session, BoardGroupMemory, col(BoardGroupMemory.board_group_id) == group_id, commit=False
     )
-    await exec_dml(session, delete(BoardGroup).where(col(BoardGroup.id) == group_id))
+    await crud.delete_where(session, BoardGroup, col(BoardGroup.id) == group_id, commit=False)
     await session.commit()
     return OkResponse()

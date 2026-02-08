@@ -5,13 +5,13 @@ from typing import Iterable
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.time import utcnow
-from app.db.sqlmodel_exec import exec_dml
+from app.db import crud
 from app.models.boards import Board
 from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
@@ -328,11 +328,11 @@ async def apply_member_access_update(
     member.updated_at = now
     session.add(member)
 
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(OrganizationBoardAccess).where(
-            col(OrganizationBoardAccess.organization_member_id) == member.id
-        ),
+        OrganizationBoardAccess,
+        col(OrganizationBoardAccess.organization_member_id) == member.id,
+        commit=False,
     )
 
     if update.all_boards_read or update.all_boards_write:
@@ -359,11 +359,11 @@ async def apply_invite_board_access(
     invite: OrganizationInvite,
     entries: Iterable[OrganizationBoardAccessSpec],
 ) -> None:
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(OrganizationInviteBoardAccess).where(
-            col(OrganizationInviteBoardAccess.organization_invite_id) == invite.id
-        ),
+        OrganizationInviteBoardAccess,
+        col(OrganizationInviteBoardAccess.organization_invite_id) == invite.id,
+        commit=False,
     )
     if invite.all_boards_read or invite.all_boards_write:
         return

@@ -6,11 +6,10 @@ from typing import Final
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db.sqlmodel_exec import exec_dml
+from app.db import crud
 from app.models.task_dependencies import TaskDependency
 from app.models.tasks import Task
 
@@ -195,11 +194,12 @@ async def replace_task_dependencies(
         task_id=task_id,
         depends_on_task_ids=depends_on_task_ids,
     )
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(TaskDependency)
-        .where(col(TaskDependency.board_id) == board_id)
-        .where(col(TaskDependency.task_id) == task_id),
+        TaskDependency,
+        col(TaskDependency.board_id) == board_id,
+        col(TaskDependency.task_id) == task_id,
+        commit=False,
     )
     for dep_id in normalized:
         session.add(

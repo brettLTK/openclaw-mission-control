@@ -11,8 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app import models  # noqa: F401
+from app import models as _models
 from app.core.config import settings
+
+# Import model modules so SQLModel metadata is fully registered at startup.
+_MODEL_REGISTRY = _models
 
 
 def _normalize_database_url(database_url: str) -> str:
@@ -64,4 +67,11 @@ async def init_db() -> None:
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            try:
+                await session.rollback()
+            except Exception:
+                logger.exception("Failed to rollback session after request error.")
+            raise

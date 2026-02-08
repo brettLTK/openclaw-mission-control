@@ -9,7 +9,7 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import asc, or_, update
+from sqlalchemy import asc, or_
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -19,9 +19,9 @@ from app.api.deps import ActorContext, require_admin_or_agent, require_org_admin
 from app.core.agent_tokens import generate_agent_token, hash_agent_token
 from app.core.auth import AuthContext, get_auth_context
 from app.core.time import utcnow
+from app.db import crud
 from app.db.pagination import paginate
 from app.db.session import async_session_maker, get_session
-from app.db.sqlmodel_exec import exec_dml
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
 from app.integrations.openclaw_gateway import OpenClawGatewayError, ensure_session, send_message
 from app.models.activity_events import ActivityEvent
@@ -101,7 +101,7 @@ async def _require_board(
     session: AsyncSession,
     board_id: UUID | str | None,
     *,
-    user: object | None = None,
+    user: User | None = None,
     write: bool = False,
 ) -> Board:
     if not board_id:
@@ -113,7 +113,7 @@ async def _require_board(
     if board is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
     if user is not None:
-        await require_board_access(session, user=user, board=board, write=write)  # type: ignore[arg-type]
+        await require_board_access(session, user=user, board=board, write=write)
     return board
 
 
@@ -972,31 +972,32 @@ async def delete_agent(
         agent_id=None,
     )
     now = datetime.now()
-    await exec_dml(
+    await crud.update_where(
         session,
-        update(Task)
-        .where(col(Task.assigned_agent_id) == agent.id)
-        .where(col(Task.status) == "in_progress")
-        .values(
-            assigned_agent_id=None,
-            status="inbox",
-            in_progress_at=None,
-            updated_at=now,
-        ),
+        Task,
+        col(Task.assigned_agent_id) == agent.id,
+        col(Task.status) == "in_progress",
+        assigned_agent_id=None,
+        status="inbox",
+        in_progress_at=None,
+        updated_at=now,
+        commit=False,
     )
-    await exec_dml(
+    await crud.update_where(
         session,
-        update(Task)
-        .where(col(Task.assigned_agent_id) == agent.id)
-        .where(col(Task.status) != "in_progress")
-        .values(
-            assigned_agent_id=None,
-            updated_at=now,
-        ),
+        Task,
+        col(Task.assigned_agent_id) == agent.id,
+        col(Task.status) != "in_progress",
+        assigned_agent_id=None,
+        updated_at=now,
+        commit=False,
     )
-    await exec_dml(
+    await crud.update_where(
         session,
-        update(ActivityEvent).where(col(ActivityEvent.agent_id) == agent.id).values(agent_id=None),
+        ActivityEvent,
+        col(ActivityEvent.agent_id) == agent.id,
+        agent_id=None,
+        commit=False,
     )
     await session.delete(agent)
     await session.commit()

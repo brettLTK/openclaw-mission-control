@@ -5,7 +5,7 @@ from typing import Any, Sequence
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, func, update
+from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -15,7 +15,6 @@ from app.core.time import utcnow
 from app.db import crud
 from app.db.pagination import paginate
 from app.db.session import get_session
-from app.db.sqlmodel_exec import exec_dml
 from app.models.activity_events import ActivityEvent
 from app.models.agents import Agent
 from app.models.approvals import Approval
@@ -214,67 +213,85 @@ async def delete_my_org(
     )
     group_ids = select(BoardGroup.id).where(col(BoardGroup.organization_id) == org_id)
 
-    await exec_dml(session, delete(ActivityEvent).where(col(ActivityEvent.task_id).in_(task_ids)))
-    await exec_dml(session, delete(ActivityEvent).where(col(ActivityEvent.agent_id).in_(agent_ids)))
-    await exec_dml(
-        session, delete(TaskDependency).where(col(TaskDependency.board_id).in_(board_ids))
+    await crud.delete_where(
+        session, ActivityEvent, col(ActivityEvent.task_id).in_(task_ids), commit=False
     )
-    await exec_dml(
+    await crud.delete_where(
+        session, ActivityEvent, col(ActivityEvent.agent_id).in_(agent_ids), commit=False
+    )
+    await crud.delete_where(
+        session, TaskDependency, col(TaskDependency.board_id).in_(board_ids), commit=False
+    )
+    await crud.delete_where(
+        session, TaskFingerprint, col(TaskFingerprint.board_id).in_(board_ids), commit=False
+    )
+    await crud.delete_where(session, Approval, col(Approval.board_id).in_(board_ids), commit=False)
+    await crud.delete_where(
+        session, BoardMemory, col(BoardMemory.board_id).in_(board_ids), commit=False
+    )
+    await crud.delete_where(
         session,
-        delete(TaskFingerprint).where(col(TaskFingerprint.board_id).in_(board_ids)),
+        BoardOnboardingSession,
+        col(BoardOnboardingSession.board_id).in_(board_ids),
+        commit=False,
     )
-    await exec_dml(session, delete(Approval).where(col(Approval.board_id).in_(board_ids)))
-    await exec_dml(session, delete(BoardMemory).where(col(BoardMemory.board_id).in_(board_ids)))
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(BoardOnboardingSession).where(col(BoardOnboardingSession.board_id).in_(board_ids)),
+        OrganizationBoardAccess,
+        col(OrganizationBoardAccess.board_id).in_(board_ids),
+        commit=False,
     )
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(OrganizationBoardAccess).where(col(OrganizationBoardAccess.board_id).in_(board_ids)),
+        OrganizationInviteBoardAccess,
+        col(OrganizationInviteBoardAccess.board_id).in_(board_ids),
+        commit=False,
     )
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(OrganizationInviteBoardAccess).where(
-            col(OrganizationInviteBoardAccess.board_id).in_(board_ids)
-        ),
+        OrganizationBoardAccess,
+        col(OrganizationBoardAccess.organization_member_id).in_(member_ids),
+        commit=False,
     )
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(OrganizationBoardAccess).where(
-            col(OrganizationBoardAccess.organization_member_id).in_(member_ids)
-        ),
+        OrganizationInviteBoardAccess,
+        col(OrganizationInviteBoardAccess.organization_invite_id).in_(invite_ids),
+        commit=False,
     )
-    await exec_dml(
+    await crud.delete_where(session, Task, col(Task.board_id).in_(board_ids), commit=False)
+    await crud.delete_where(session, Agent, col(Agent.board_id).in_(board_ids), commit=False)
+    await crud.delete_where(session, Board, col(Board.organization_id) == org_id, commit=False)
+    await crud.delete_where(
         session,
-        delete(OrganizationInviteBoardAccess).where(
-            col(OrganizationInviteBoardAccess.organization_invite_id).in_(invite_ids)
-        ),
+        BoardGroupMemory,
+        col(BoardGroupMemory.board_group_id).in_(group_ids),
+        commit=False,
     )
-    await exec_dml(session, delete(Task).where(col(Task.board_id).in_(board_ids)))
-    await exec_dml(session, delete(Agent).where(col(Agent.board_id).in_(board_ids)))
-    await exec_dml(session, delete(Board).where(col(Board.organization_id) == org_id))
-    await exec_dml(
+    await crud.delete_where(
+        session, BoardGroup, col(BoardGroup.organization_id) == org_id, commit=False
+    )
+    await crud.delete_where(session, Gateway, col(Gateway.organization_id) == org_id, commit=False)
+    await crud.delete_where(
         session,
-        delete(BoardGroupMemory).where(col(BoardGroupMemory.board_group_id).in_(group_ids)),
+        OrganizationInvite,
+        col(OrganizationInvite.organization_id) == org_id,
+        commit=False,
     )
-    await exec_dml(session, delete(BoardGroup).where(col(BoardGroup.organization_id) == org_id))
-    await exec_dml(session, delete(Gateway).where(col(Gateway.organization_id) == org_id))
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(OrganizationInvite).where(col(OrganizationInvite.organization_id) == org_id),
+        OrganizationMember,
+        col(OrganizationMember.organization_id) == org_id,
+        commit=False,
     )
-    await exec_dml(
+    await crud.update_where(
         session,
-        delete(OrganizationMember).where(col(OrganizationMember.organization_id) == org_id),
+        User,
+        col(User.active_organization_id) == org_id,
+        active_organization_id=None,
+        commit=False,
     )
-    await exec_dml(
-        session,
-        update(User)
-        .where(col(User.active_organization_id) == org_id)
-        .values(active_organization_id=None),
-    )
-    await exec_dml(session, delete(Organization).where(col(Organization.id) == org_id))
+    await crud.delete_where(session, Organization, col(Organization.id) == org_id, commit=False)
     await session.commit()
     return OkResponse()
 
@@ -425,11 +442,11 @@ async def remove_org_member(
                 detail="Organization must have at least one owner",
             )
 
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(OrganizationBoardAccess).where(
-            col(OrganizationBoardAccess.organization_member_id) == member.id
-        ),
+        OrganizationBoardAccess,
+        col(OrganizationBoardAccess.organization_member_id) == member.id,
+        commit=False,
     )
 
     user = await User.objects.by_id(member.user_id).first(session)
@@ -532,11 +549,11 @@ async def revoke_org_invite(
         organization_id=ctx.organization.id,
         invite_id=invite_id,
     )
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(OrganizationInviteBoardAccess).where(
-            col(OrganizationInviteBoardAccess.organization_invite_id) == invite.id
-        ),
+        OrganizationInviteBoardAccess,
+        col(OrganizationInviteBoardAccess.organization_invite_id) == invite.id,
+        commit=False,
     )
     await crud.delete(session, invite)
     return OrganizationInviteRead.model_validate(invite, from_attributes=True)

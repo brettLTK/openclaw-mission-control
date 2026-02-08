@@ -21,6 +21,7 @@ from app.integrations.openclaw_gateway_protocol import (
 )
 from app.models.boards import Board
 from app.models.gateways import Gateway
+from app.models.users import User
 from app.schemas.common import OkResponse
 from app.schemas.gateway_api import (
     GatewayCommandsResponse,
@@ -43,7 +44,7 @@ async def _resolve_gateway(
     gateway_token: str | None,
     gateway_main_session_key: str | None,
     *,
-    user: object | None = None,
+    user: User | None = None,
 ) -> tuple[Board | None, GatewayClientConfig, str | None]:
     if gateway_url:
         return (
@@ -59,8 +60,8 @@ async def _resolve_gateway(
     board = await Board.objects.by_id(board_id).first(session)
     if board is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Board not found")
-    if isinstance(user, object) and user is not None:
-        await require_board_access(session, user=user, board=board, write=False)  # type: ignore[arg-type]
+    if user is not None:
+        await require_board_access(session, user=user, board=board, write=False)
     if not board.gateway_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -85,7 +86,7 @@ async def _resolve_gateway(
 
 
 async def _require_gateway(
-    session: AsyncSession, board_id: str | None, *, user: object | None = None
+    session: AsyncSession, board_id: str | None, *, user: User | None = None
 ) -> tuple[Board, GatewayClientConfig, str | None]:
     board, config, main_session = await _resolve_gateway(
         session,

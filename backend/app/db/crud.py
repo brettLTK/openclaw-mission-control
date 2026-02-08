@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
+from sqlalchemy import delete as sql_delete
+from sqlalchemy import update as sql_update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -17,6 +19,22 @@ class DoesNotExist(LookupError):
 
 class MultipleObjectsReturned(LookupError):
     pass
+
+
+async def _flush_or_rollback(session: AsyncSession) -> None:
+    try:
+        await session.flush()
+    except Exception:
+        await session.rollback()
+        raise
+
+
+async def _commit_or_rollback(session: AsyncSession) -> None:
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
 
 
 def _lookup_statement(model: type[ModelT], lookup: Mapping[str, Any]) -> SelectOfScalar[ModelT]:
@@ -58,9 +76,9 @@ async def create(
 ) -> ModelT:
     obj = model.model_validate(data)
     session.add(obj)
-    await session.flush()
+    await _flush_or_rollback(session)
     if commit:
-        await session.commit()
+        await _commit_or_rollback(session)
     if refresh:
         await session.refresh(obj)
     return obj
@@ -74,9 +92,9 @@ async def save(
     refresh: bool = True,
 ) -> ModelT:
     session.add(obj)
-    await session.flush()
+    await _flush_or_rollback(session)
     if commit:
-        await session.commit()
+        await _commit_or_rollback(session)
     if refresh:
         await session.refresh(obj)
     return obj
@@ -85,7 +103,7 @@ async def save(
 async def delete(session: AsyncSession, obj: ModelT, *, commit: bool = True) -> None:
     await session.delete(obj)
     if commit:
-        await session.commit()
+        await _commit_or_rollback(session)
 
 
 async def list_by(
@@ -109,6 +127,77 @@ async def list_by(
 
 async def exists(session: AsyncSession, model: type[ModelT], **lookup: Any) -> bool:
     return (await session.exec(_lookup_statement(model, lookup).limit(1))).first() is not None
+
+
+def _criteria_statement(model: type[ModelT], criteria: tuple[Any, ...]) -> SelectOfScalar[ModelT]:
+    stmt = select(model)
+    if criteria:
+        stmt = stmt.where(*criteria)
+    return stmt
+
+
+async def list_where(
+    session: AsyncSession,
+    model: type[ModelT],
+    *criteria: Any,
+    order_by: Iterable[Any] = (),
+) -> list[ModelT]:
+    stmt = _criteria_statement(model, criteria)
+    for ordering in order_by:
+        stmt = stmt.order_by(ordering)
+    return list(await session.exec(stmt))
+
+
+async def delete_where(
+    session: AsyncSession,
+    model: type[ModelT],
+    *criteria: Any,
+    commit: bool = False,
+) -> int:
+    stmt = sql_delete(model)
+    if criteria:
+        stmt = stmt.where(*criteria)
+    result = await session.exec(cast(Any, stmt))
+    if commit:
+        await _commit_or_rollback(session)
+    rowcount = getattr(result, "rowcount", None)
+    return int(rowcount) if isinstance(rowcount, int) else 0
+
+
+async def update_where(
+    session: AsyncSession,
+    model: type[ModelT],
+    *criteria: Any,
+    updates: Mapping[str, Any] | None = None,
+    commit: bool = False,
+    exclude_none: bool = False,
+    allowed_fields: set[str] | None = None,
+    **update_fields: Any,
+) -> int:
+    source_updates: dict[str, Any] = {}
+    if updates:
+        source_updates.update(dict(updates))
+    if update_fields:
+        source_updates.update(update_fields)
+
+    values: dict[str, Any] = {}
+    for key, value in source_updates.items():
+        if allowed_fields is not None and key not in allowed_fields:
+            continue
+        if exclude_none and value is None:
+            continue
+        values[key] = value
+    if not values:
+        return 0
+
+    stmt = sql_update(model).values(**values)
+    if criteria:
+        stmt = stmt.where(*criteria)
+    result = await session.exec(cast(Any, stmt))
+    if commit:
+        await _commit_or_rollback(session)
+    rowcount = getattr(result, "rowcount", None)
+    return int(rowcount) if isinstance(rowcount, int) else 0
 
 
 def apply_updates(
@@ -178,6 +267,9 @@ async def get_or_create(
         existing = (await session.exec(stmt)).first()
         if existing is not None:
             return existing, False
+        raise
+    except Exception:
+        await session.rollback()
         raise
 
     if refresh:

@@ -9,7 +9,7 @@ from typing import cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import asc, delete, desc, or_
+from sqlalchemy import asc, desc, or_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql.expression import Select
@@ -25,9 +25,9 @@ from app.api.deps import (
 )
 from app.core.auth import AuthContext
 from app.core.time import utcnow
+from app.db import crud
 from app.db.pagination import paginate
 from app.db.session import async_session_maker, get_session
-from app.db.sqlmodel_exec import exec_dml
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
 from app.integrations.openclaw_gateway import OpenClawGatewayError, ensure_session, send_message
 from app.models.activity_events import ActivityEvent
@@ -997,17 +997,21 @@ async def delete_task(
     if auth.user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     await require_board_access(session, user=auth.user, board=board, write=True)
-    await exec_dml(session, delete(ActivityEvent).where(col(ActivityEvent.task_id) == task.id))
-    await exec_dml(session, delete(TaskFingerprint).where(col(TaskFingerprint.task_id) == task.id))
-    await exec_dml(session, delete(Approval).where(col(Approval.task_id) == task.id))
-    await exec_dml(
+    await crud.delete_where(
+        session, ActivityEvent, col(ActivityEvent.task_id) == task.id, commit=False
+    )
+    await crud.delete_where(
+        session, TaskFingerprint, col(TaskFingerprint.task_id) == task.id, commit=False
+    )
+    await crud.delete_where(session, Approval, col(Approval.task_id) == task.id, commit=False)
+    await crud.delete_where(
         session,
-        delete(TaskDependency).where(
-            or_(
-                col(TaskDependency.task_id) == task.id,
-                col(TaskDependency.depends_on_task_id) == task.id,
-            )
+        TaskDependency,
+        or_(
+            col(TaskDependency.task_id) == task.id,
+            col(TaskDependency.depends_on_task_id) == task.id,
         ),
+        commit=False,
     )
     await session.delete(task)
     await session.commit()

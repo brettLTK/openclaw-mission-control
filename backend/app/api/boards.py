@@ -4,7 +4,7 @@ import re
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import delete, func
+from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -19,7 +19,6 @@ from app.core.time import utcnow
 from app.db import crud
 from app.db.pagination import paginate
 from app.db.session import get_session
-from app.db.sqlmodel_exec import exec_dml
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
 from app.integrations.openclaw_gateway import (
     OpenClawGatewayError,
@@ -307,43 +306,38 @@ async def delete_board(
             ) from exc
 
     if task_ids:
-        await exec_dml(
-            session, delete(ActivityEvent).where(col(ActivityEvent.task_id).in_(task_ids))
+        await crud.delete_where(
+            session, ActivityEvent, col(ActivityEvent.task_id).in_(task_ids), commit=False
         )
-    await exec_dml(session, delete(TaskDependency).where(col(TaskDependency.board_id) == board.id))
-    await exec_dml(
-        session, delete(TaskFingerprint).where(col(TaskFingerprint.board_id) == board.id)
-    )
+    await crud.delete_where(session, TaskDependency, col(TaskDependency.board_id) == board.id)
+    await crud.delete_where(session, TaskFingerprint, col(TaskFingerprint.board_id) == board.id)
 
     # Approvals can reference tasks and agents, so delete before both.
-    await exec_dml(session, delete(Approval).where(col(Approval.board_id) == board.id))
+    await crud.delete_where(session, Approval, col(Approval.board_id) == board.id)
 
-    await exec_dml(session, delete(BoardMemory).where(col(BoardMemory.board_id) == board.id))
-    await exec_dml(
-        session,
-        delete(BoardOnboardingSession).where(col(BoardOnboardingSession.board_id) == board.id),
+    await crud.delete_where(session, BoardMemory, col(BoardMemory.board_id) == board.id)
+    await crud.delete_where(
+        session, BoardOnboardingSession, col(BoardOnboardingSession.board_id) == board.id
     )
-    await exec_dml(
-        session,
-        delete(OrganizationBoardAccess).where(col(OrganizationBoardAccess.board_id) == board.id),
+    await crud.delete_where(
+        session, OrganizationBoardAccess, col(OrganizationBoardAccess.board_id) == board.id
     )
-    await exec_dml(
+    await crud.delete_where(
         session,
-        delete(OrganizationInviteBoardAccess).where(
-            col(OrganizationInviteBoardAccess.board_id) == board.id
-        ),
+        OrganizationInviteBoardAccess,
+        col(OrganizationInviteBoardAccess.board_id) == board.id,
     )
 
     # Tasks reference agents (assigned_agent_id) and have dependents (fingerprints/dependencies), so
     # delete tasks before agents.
-    await exec_dml(session, delete(Task).where(col(Task.board_id) == board.id))
+    await crud.delete_where(session, Task, col(Task.board_id) == board.id)
 
     if agents:
         agent_ids = [agent.id for agent in agents]
-        await exec_dml(
-            session, delete(ActivityEvent).where(col(ActivityEvent.agent_id).in_(agent_ids))
+        await crud.delete_where(
+            session, ActivityEvent, col(ActivityEvent.agent_id).in_(agent_ids), commit=False
         )
-        await exec_dml(session, delete(Agent).where(col(Agent.id).in_(agent_ids)))
+        await crud.delete_where(session, Agent, col(Agent.id).in_(agent_ids))
     await session.delete(board)
     await session.commit()
     return OkResponse()
