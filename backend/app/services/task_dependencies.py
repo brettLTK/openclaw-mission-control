@@ -134,7 +134,7 @@ async def validate_dependency_update(
     normalized = _dedupe_uuid_list(depends_on_task_ids)
     if task_id in normalized:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Task cannot depend on itself.",
         )
     if not normalized:
