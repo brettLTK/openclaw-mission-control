@@ -201,9 +201,7 @@ async def ensure_member_for_user(
 
     # Serialize first-time provisioning per user to avoid concurrent duplicate org/member creation.
     await session.exec(
-        select(User.id)
-        .where(col(User.id) == user.id)
-        .with_for_update(),
+        select(User.id).where(col(User.id) == user.id).with_for_update(),
     )
 
     existing_member = await get_first_membership(session, user.id)

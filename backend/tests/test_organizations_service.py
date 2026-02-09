@@ -216,8 +216,7 @@ async def test_ensure_member_for_user_creates_personal_org_and_owner(
     assert out.all_boards_write is True
     assert out.organization_id == user.active_organization_id
     assert any(
-        isinstance(item, Organization) and item.id == out.organization_id
-        for item in session.added
+        isinstance(item, Organization) and item.id == out.organization_id for item in session.added
     )
     assert session.committed == 1
 
