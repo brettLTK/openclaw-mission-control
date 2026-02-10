@@ -13,7 +13,9 @@ from fastapi import HTTPException, status
 
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
 from app.integrations.openclaw_gateway import OpenClawGatewayError
-from app.services.openclaw import services as lifecycle
+from app.services.openclaw import coordination_service as coordination_lifecycle
+from app.services.openclaw import onboarding_service as onboarding_lifecycle
+from app.services.openclaw.shared import GatewayAgentIdentity
 
 
 @dataclass
@@ -46,7 +48,7 @@ class _BoardStub:
 @pytest.mark.asyncio
 async def test_gateway_coordination_nudge_success(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _FakeSession()
-    service = lifecycle.GatewayCoordinationService(session)  # type: ignore[arg-type]
+    service = coordination_lifecycle.GatewayCoordinationService(session)  # type: ignore[arg-type]
     board = _BoardStub(id=uuid4(), gateway_id=uuid4(), name="Roadmap")
     actor = _AgentStub(id=uuid4(), name="Lead Agent", board_id=board.id)
     target = _AgentStub(
@@ -58,7 +60,7 @@ async def test_gateway_coordination_nudge_success(monkeypatch: pytest.MonkeyPatc
     captured: list[dict[str, Any]] = []
 
     async def _fake_board_agent_or_404(
-        self: lifecycle.GatewayCoordinationService,
+        self: coordination_lifecycle.GatewayCoordinationService,
         *,
         board: object,
         agent_id: str,
@@ -78,17 +80,17 @@ async def test_gateway_coordination_nudge_success(monkeypatch: pytest.MonkeyPatc
         return {"ok": True}
 
     monkeypatch.setattr(
-        lifecycle.GatewayCoordinationService,
+        coordination_lifecycle.GatewayCoordinationService,
         "_board_agent_or_404",
         _fake_board_agent_or_404,
     )
     monkeypatch.setattr(
-        lifecycle,
+        coordination_lifecycle,
         "require_gateway_config_for_board",
         _fake_require_gateway_config_for_board,
     )
     monkeypatch.setattr(
-        lifecycle,
+        coordination_lifecycle,
         "send_gateway_agent_message",
         _fake_send_gateway_agent_message,
     )
@@ -113,7 +115,7 @@ async def test_gateway_coordination_nudge_maps_gateway_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _FakeSession()
-    service = lifecycle.GatewayCoordinationService(session)  # type: ignore[arg-type]
+    service = coordination_lifecycle.GatewayCoordinationService(session)  # type: ignore[arg-type]
     board = _BoardStub(id=uuid4(), gateway_id=uuid4(), name="Roadmap")
     actor = _AgentStub(id=uuid4(), name="Lead Agent", board_id=board.id)
     target = _AgentStub(
@@ -124,7 +126,7 @@ async def test_gateway_coordination_nudge_maps_gateway_error(
     )
 
     async def _fake_board_agent_or_404(
-        self: lifecycle.GatewayCoordinationService,
+        self: coordination_lifecycle.GatewayCoordinationService,
         *,
         board: object,
         agent_id: str,
@@ -143,17 +145,17 @@ async def test_gateway_coordination_nudge_maps_gateway_error(
         raise OpenClawGatewayError("dial tcp: connection refused")
 
     monkeypatch.setattr(
-        lifecycle.GatewayCoordinationService,
+        coordination_lifecycle.GatewayCoordinationService,
         "_board_agent_or_404",
         _fake_board_agent_or_404,
     )
     monkeypatch.setattr(
-        lifecycle,
+        coordination_lifecycle,
         "require_gateway_config_for_board",
         _fake_require_gateway_config_for_board,
     )
     monkeypatch.setattr(
-        lifecycle,
+        coordination_lifecycle,
         "send_gateway_agent_message",
         _fake_send_gateway_agent_message,
     )
@@ -177,7 +179,7 @@ async def test_board_onboarding_dispatch_start_returns_session_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _FakeSession()
-    service = lifecycle.BoardOnboardingMessagingService(session)  # type: ignore[arg-type]
+    service = onboarding_lifecycle.BoardOnboardingMessagingService(session)  # type: ignore[arg-type]
     gateway_id = uuid4()
     board = _BoardStub(id=uuid4(), gateway_id=gateway_id, name="Roadmap")
     captured: list[dict[str, Any]] = []
@@ -194,12 +196,12 @@ async def test_board_onboarding_dispatch_start_returns_session_key(
         return {"ok": True}
 
     monkeypatch.setattr(
-        lifecycle,
+        onboarding_lifecycle,
         "require_gateway_config_for_board",
         _fake_require_gateway_config_for_board,
     )
     monkeypatch.setattr(
-        lifecycle,
+        coordination_lifecycle,
         "send_gateway_agent_message",
         _fake_send_gateway_agent_message,
     )
@@ -210,7 +212,7 @@ async def test_board_onboarding_dispatch_start_returns_session_key(
         correlation_id="onboarding-corr-id",
     )
 
-    assert session_key == lifecycle.GatewayAgentIdentity.session_key_for_id(gateway_id)
+    assert session_key == GatewayAgentIdentity.session_key_for_id(gateway_id)
     assert len(captured) == 1
     assert captured[0]["agent_name"] == "Gateway Agent"
     assert captured[0]["deliver"] is False
@@ -221,7 +223,7 @@ async def test_board_onboarding_dispatch_answer_maps_timeout_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _FakeSession()
-    service = lifecycle.BoardOnboardingMessagingService(session)  # type: ignore[arg-type]
+    service = onboarding_lifecycle.BoardOnboardingMessagingService(session)  # type: ignore[arg-type]
     board = _BoardStub(id=uuid4(), gateway_id=uuid4(), name="Roadmap")
     onboarding = SimpleNamespace(id=uuid4(), session_key="agent:gateway-main:main")
 
@@ -236,12 +238,12 @@ async def test_board_onboarding_dispatch_answer_maps_timeout_error(
         raise TimeoutError("gateway timeout")
 
     monkeypatch.setattr(
-        lifecycle,
+        onboarding_lifecycle,
         "require_gateway_config_for_board",
         _fake_require_gateway_config_for_board,
     )
     monkeypatch.setattr(
-        lifecycle,
+        coordination_lifecycle,
         "send_gateway_agent_message",
         _fake_send_gateway_agent_message,
     )
