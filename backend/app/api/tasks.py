@@ -1438,6 +1438,8 @@ async def _lead_effective_dependencies(
     *,
     update: _TaskUpdateInput,
 ) -> tuple[list[UUID], list[UUID]]:
+    # Use newly normalized dependency updates when supplied; otherwise fall back
+    # to the task's current dependencies for blocked-by evaluation.
     normalized_deps: list[UUID] | None = None
     if update.depends_on_task_ids is not None:
         if update.task.status == "done":
@@ -1659,6 +1661,8 @@ async def _apply_non_lead_agent_task_rules(
         and update.actor.agent.board_id != update.task.board_id
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+    # Agents are limited to status/comment updates, and non-inbox status moves
+    # must pass dependency checks before they can proceed.
     allowed_fields = {"status", "comment"}
     if (
         update.depends_on_task_ids is not None
@@ -1732,6 +1736,8 @@ async def _apply_admin_task_rules(
     target_status = _required_status_value(
         update.updates.get("status", update.task.status),
     )
+    # Reset blocked tasks to inbox unless the task is already done and remains
+    # done, which is the explicit done-task exception.
     if blocked_ids and not (update.task.status == "done" and target_status == "done"):
         update.task.status = "inbox"
         update.task.assigned_agent_id = None
@@ -1788,6 +1794,8 @@ async def _record_task_update_activity(
     actor_agent_id = (
         update.actor.agent.id if update.actor.actor_type == "agent" and update.actor.agent else None
     )
+    # Record the task transition first, then reconcile dependents so any
+    # cascaded dependency effects are logged after the source change.
     record_activity(
         session,
         event_type=event_type,
@@ -1888,6 +1896,8 @@ async def _finalize_updated_task(
     update.task.updated_at = utcnow()
 
     status_raw = update.updates.get("status")
+    # Entering review requires either a new comment or a valid recent one to
+    # ensure reviewers get context on readiness.
     if status_raw == "review":
         comment_text = (update.comment or "").strip()
         if not comment_text and not await has_valid_recent_comment(

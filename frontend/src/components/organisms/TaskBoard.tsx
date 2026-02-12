@@ -155,6 +155,7 @@ export const TaskBoard = memo(function TaskBoard({
     return positions;
   }, []);
 
+  // Animate card reordering smoothly by applying FLIP whenever layout positions change.
   useLayoutEffect(() => {
     const cardRefsSnapshot = cardRefs.current;
     if (animationRafRef.current !== null) {
@@ -275,6 +276,7 @@ export const TaskBoard = memo(function TaskBoard({
     return buckets;
   }, [tasks]);
 
+  // Keep drag/drop state and payload handling centralized for column move interactions.
   const handleDragStart =
     (task: Task) => (event: React.DragEvent<HTMLDivElement>) => {
       if (readOnly) {
@@ -344,6 +346,7 @@ export const TaskBoard = memo(function TaskBoard({
     >
       {columns.map((column) => {
         const columnTasks = grouped[column.status] ?? [];
+        // Derive review tab counts and the active subset from one canonical task list.
         const reviewCounts =
           column.status === "review"
             ? columnTasks.reduce(

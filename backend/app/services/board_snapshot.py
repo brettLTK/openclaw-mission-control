@@ -149,6 +149,8 @@ async def build_board_snapshot(session: AsyncSession, board: Board) -> BoardSnap
         approval_ids=approval_ids,
     )
     task_title_by_id = {task.id: task.title for task in tasks}
+    # Hydrate each approval with linked task metadata, falling back to legacy
+    # single-task fields so older rows still render complete approval cards.
     approval_reads = [
         _approval_to_read(
             approval,

@@ -63,3 +63,25 @@ async def test_delete_board_cleans_org_board_access_rows() -> None:
     assert "organization_invite_board_access" in deleted_table_names
     assert board in session.deleted
     assert session.committed == 1
+
+
+@pytest.mark.asyncio
+async def test_delete_board_cleans_tag_assignments_before_tasks() -> None:
+    """Deleting a board should remove task-tag links before deleting tasks."""
+    session: Any = _FakeSession(exec_results=[[], [uuid4()]])
+    board = Board(
+        id=uuid4(),
+        organization_id=uuid4(),
+        name="Demo Board",
+        slug="demo-board",
+        gateway_id=None,
+    )
+
+    await boards.delete_board(
+        session=session,
+        board=board,
+    )
+
+    deleted_table_names = [statement.table.name for statement in session.executed]
+    assert "tag_assignments" in deleted_table_names
+    assert deleted_table_names.index("tag_assignments") < deleted_table_names.index("tasks")
