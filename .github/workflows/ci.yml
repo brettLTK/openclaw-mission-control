@@ -126,16 +126,6 @@ jobs:
             nextjs-${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-
 
 
-      - name: Cache Next.js build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            frontend/.next/cache
-          key: nextjs-${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('frontend/package-lock.json') }}
-          restore-keys: |
-            nextjs-${{ runner.os }}-node-${{ steps.setup-node.outputs.node-version }}-
-
-
       - name: Start frontend (dev server)
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
