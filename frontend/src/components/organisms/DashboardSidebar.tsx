@@ -57,10 +57,14 @@ export function DashboardSidebar() {
   return (
     <aside className="flex h-full w-64 flex-col border-r border-slate-200 bg-white">
       <div className="flex-1 px-3 py-4">
-        <p className="px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Navigation</p>
+        <p className="px-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          Navigation
+        </p>
         <nav className="mt-3 space-y-4 text-sm">
           <div>
-            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Overview</p>
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Overview
+            </p>
             <div className="mt-1 space-y-1">
               <Link
                 href="/dashboard"
@@ -90,7 +94,9 @@ export function DashboardSidebar() {
           </div>
 
           <div>
-            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Boards</p>
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Boards
+            </p>
             <div className="mt-1 space-y-1">
               <Link
                 href="/board-groups"

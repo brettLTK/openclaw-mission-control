@@ -250,9 +250,7 @@ async def _query_wip(
     if not board_ids:
         return _wip_series_from_mapping(range_spec, {})
 
-    inbox_bucket_col = func.date_trunc(range_spec.bucket, Task.created_at).label(
-        "inbox_bucket"
-    )
+    inbox_bucket_col = func.date_trunc(range_spec.bucket, Task.created_at).label("inbox_bucket")
     inbox_statement = (
         select(inbox_bucket_col, func.count())
         .where(col(Task.status) == "inbox")
@@ -264,9 +262,7 @@ async def _query_wip(
     )
     inbox_results = (await session.exec(inbox_statement)).all()
 
-    status_bucket_col = func.date_trunc(range_spec.bucket, Task.updated_at).label(
-        "status_bucket"
-    )
+    status_bucket_col = func.date_trunc(range_spec.bucket, Task.updated_at).label("status_bucket")
     progress_case = case((col(Task.status) == "in_progress", 1), else_=0)
     review_case = case((col(Task.status) == "review", 1), else_=0)
     done_case = case((col(Task.status) == "done", 1), else_=0)

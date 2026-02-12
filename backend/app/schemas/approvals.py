@@ -11,6 +11,7 @@ from sqlmodel import Field, SQLModel
 
 ApprovalStatus = Literal["pending", "approved", "rejected"]
 STATUS_REQUIRED_ERROR = "status is required"
+LEAD_REASONING_REQUIRED_ERROR = "lead reasoning is required"
 RUNTIME_ANNOTATION_TYPES = (datetime, UUID)
 
 
@@ -21,7 +22,7 @@ class ApprovalBase(SQLModel):
     task_id: UUID | None = None
     task_ids: list[UUID] = Field(default_factory=list)
     payload: dict[str, object] | None = None
-    confidence: int
+    confidence: float = Field(ge=0, le=100)
     rubric_scores: dict[str, int] | None = None
     status: ApprovalStatus = "pending"
 
@@ -48,6 +49,21 @@ class ApprovalCreate(ApprovalBase):
 
     agent_id: UUID | None = None
 
+    @model_validator(mode="after")
+    def validate_lead_reasoning(self) -> Self:
+        """Ensure each approval request includes explicit lead reasoning."""
+        payload = self.payload
+        if isinstance(payload, dict):
+            reason = payload.get("reason")
+            if isinstance(reason, str) and reason.strip():
+                return self
+            decision = payload.get("decision")
+            if isinstance(decision, dict):
+                nested_reason = decision.get("reason")
+                if isinstance(nested_reason, str) and nested_reason.strip():
+                    return self
+        raise ValueError(LEAD_REASONING_REQUIRED_ERROR)
+
 
 class ApprovalUpdate(SQLModel):
     """Payload for mutating approval status."""
@@ -67,6 +83,7 @@ class ApprovalRead(ApprovalBase):
 
     id: UUID
     board_id: UUID
+    task_titles: list[str] = Field(default_factory=list)
     agent_id: UUID | None = None
     created_at: datetime
     resolved_at: datetime | None = None

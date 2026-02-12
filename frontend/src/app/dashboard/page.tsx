@@ -252,7 +252,8 @@ export default function DashboardPage() {
   const searchParams = useSearchParams();
   const selectedRangeParam = searchParams.get("range");
   const selectedRange: RangeKey =
-    selectedRangeParam && DASHBOARD_RANGE_SET.has(selectedRangeParam as RangeKey)
+    selectedRangeParam &&
+    DASHBOARD_RANGE_SET.has(selectedRangeParam as RangeKey)
       ? (selectedRangeParam as RangeKey)
       : DEFAULT_RANGE;
   const metricsQuery = useDashboardMetricsApiV1MetricsDashboardGet<
@@ -401,10 +402,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-                  <ChartCard
-                    title="Completed Tasks"
-                    subtitle="Throughput"
-                  >
+                  <ChartCard title="Completed Tasks" subtitle="Throughput">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={throughputSeries}
@@ -449,10 +447,7 @@ export default function DashboardPage() {
                     </ResponsiveContainer>
                   </ChartCard>
 
-                  <ChartCard
-                    title="Avg Hours to Review"
-                    subtitle="Cycle time"
-                  >
+                  <ChartCard title="Avg Hours to Review" subtitle="Cycle time">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={cycleSeries}
@@ -501,10 +496,7 @@ export default function DashboardPage() {
                     </ResponsiveContainer>
                   </ChartCard>
 
-                  <ChartCard
-                    title="Failed Events"
-                    subtitle="Error rate"
-                  >
+                  <ChartCard title="Failed Events" subtitle="Error rate">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={errorSeries}
