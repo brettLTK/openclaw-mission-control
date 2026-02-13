@@ -16,6 +16,7 @@ import {
 } from "@/components/tables/DataTable";
 import { dateCell } from "@/components/tables/cell-formatters";
 import type { TaskCustomFieldDefinitionRead } from "@/api/generated/model";
+import { formatCustomFieldDefaultValue } from "./custom-field-form-utils";
 
 type CustomFieldsTableProps = {
   fields: TaskCustomFieldDefinitionRead[];
@@ -48,16 +49,6 @@ const DEFAULT_EMPTY_ICON = (
     <path d="M3 18h.01" />
   </svg>
 );
-
-const formatDefaultValue = (value: unknown): string => {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-};
 
 export function CustomFieldsTable({
   fields,
@@ -131,7 +122,7 @@ export function CustomFieldsTable({
         enableSorting: false,
         cell: ({ row }) => (
           <p className="font-mono text-xs break-all text-slate-700">
-            {formatDefaultValue(row.original.default_value) || "—"}
+            {formatCustomFieldDefaultValue(row.original.default_value) || "—"}
           </p>
         ),
       },

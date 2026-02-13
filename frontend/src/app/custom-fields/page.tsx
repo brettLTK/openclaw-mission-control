@@ -17,6 +17,7 @@ import {
 } from "@/api/generated/org-custom-fields/org-custom-fields";
 import type { TaskCustomFieldDefinitionRead } from "@/api/generated/model";
 import { CustomFieldsTable } from "@/components/custom-fields/CustomFieldsTable";
+import { extractApiErrorMessage } from "@/components/custom-fields/custom-field-form-utils";
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { buttonVariants } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -24,12 +25,6 @@ import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import { useUrlSorting } from "@/lib/use-url-sorting";
 
 const CUSTOM_FIELD_SORTABLE_COLUMNS = ["field_key", "required", "updated_at"];
-
-const extractErrorMessage = (error: unknown, fallback: string) => {
-  if (error instanceof ApiError) return error.message || fallback;
-  if (error instanceof Error) return error.message || fallback;
-  return fallback;
-};
 
 export default function CustomFieldsPage() {
   const { isSignedIn } = useAuth();
@@ -150,7 +145,7 @@ export default function CustomFieldsPage() {
         }
         errorMessage={
           deleteMutation.error
-            ? extractErrorMessage(
+            ? extractApiErrorMessage(
                 deleteMutation.error,
                 "Unable to delete custom field.",
               )
