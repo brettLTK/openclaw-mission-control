@@ -2075,15 +2075,7 @@ async def _apply_non_lead_agent_task_rules(
             code="task_board_mismatch",
             message="Agent can only update tasks for their assigned board.",
         )
-    if (
-        update.actor.agent
-        and "status" in update.updates
-        and (update.task.assigned_agent_id is None)
-    ):
-        raise _task_update_forbidden_error(
-            code="task_assignee_required",
-            message="Agents can only change status on tasks assigned to them.",
-        )
+    # Allow agents to claim unassigned tasks by updating status (when permitted by board rules).
     if (
         update.actor.agent
         and update.task.assigned_agent_id is not None

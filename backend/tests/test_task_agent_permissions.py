@@ -100,7 +100,7 @@ async def test_non_lead_agent_can_update_status_for_assigned_task() -> None:
 
 
 @pytest.mark.asyncio
-async def test_non_lead_agent_forbidden_without_assigned_task() -> None:
+async def test_non_lead_agent_can_update_status_for_unassigned_task() -> None:
     engine = await _make_engine()
     try:
         async with await _make_session(engine) as session:
@@ -127,6 +127,7 @@ async def test_non_lead_agent_forbidden_without_assigned_task() -> None:
                     name="board",
                     slug="board",
                     gateway_id=gateway_id,
+                    only_lead_can_change_status=False,
                 ),
             )
             session.add(
@@ -155,21 +156,15 @@ async def test_non_lead_agent_forbidden_without_assigned_task() -> None:
             actor = (await session.exec(select(Agent).where(col(Agent.id) == actor_id))).first()
             assert actor is not None
 
-            with pytest.raises(HTTPException) as exc:
-                await tasks_api.update_task(
-                    payload=TaskUpdate(status="in_progress"),
-                    task=task,
-                    session=session,
-                    actor=ActorContext(actor_type="agent", agent=actor),
-                )
-
-            assert exc.value.status_code == 403
-            assert isinstance(exc.value.detail, dict)
-            assert exc.value.detail["code"] == "task_assignee_required"
-            assert (
-                exc.value.detail["message"]
-                == "Agents can only change status on tasks assigned to them."
+            updated = await tasks_api.update_task(
+                payload=TaskUpdate(status="in_progress"),
+                task=task,
+                session=session,
+                actor=ActorContext(actor_type="agent", agent=actor),
             )
+
+            assert updated.status == "in_progress"
+            assert updated.assigned_agent_id == actor_id
     finally:
         await engine.dispose()
 
