@@ -45,6 +45,7 @@ from app.schemas.gateway_coordination import (
     GatewayMainAskUserRequest,
     GatewayMainAskUserResponse,
 )
+from app.schemas.health import AgentHealthStatusResponse
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.schemas.tags import TagRef
 from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
@@ -184,6 +185,73 @@ def _guard_task_access(agent_ctx: AgentAuthContext, task: Task) -> None:
         agent_ctx.agent.board_id and task.board_id and agent_ctx.agent.board_id != task.board_id
     )
     OpenClawAuthorizationPolicy.require_board_write_access(allowed=allowed)
+
+
+@router.get(
+    "/healthz",
+    response_model=AgentHealthStatusResponse,
+    tags=AGENT_ALL_ROLE_TAGS,
+    summary="Agent Auth Health Check",
+    description=(
+        "Token-authenticated liveness probe for agent API clients.\n\n"
+        "Use this endpoint when the caller needs to verify both service availability "
+        "and agent-token validity in one request."
+    ),
+    openapi_extra={
+        "x-llm-intent": "agent_auth_health",
+        "x-when-to-use": [
+            "Verify agent token validity before entering an automation loop",
+            "Confirm agent API availability with caller identity context",
+        ],
+        "x-when-not-to-use": [
+            "General infrastructure liveness checks that do not require auth context",
+            "Task, board, or messaging workflow actions",
+        ],
+        "x-required-actor": "any_agent",
+        "x-prerequisites": [
+            "Authenticated agent token via X-Agent-Token header",
+        ],
+        "x-side-effects": [
+            "May refresh agent last-seen presence metadata via auth middleware",
+        ],
+        "x-negative-guidance": [
+            "Do not parse this response as an array.",
+            "Do not use this endpoint for task routing decisions.",
+        ],
+        "x-routing-policy": [
+            "Use this as the first probe for agent-scoped automation health.",
+            "Use /healthz only for unauthenticated service-level liveness checks.",
+        ],
+        "x-routing-policy-examples": [
+            {
+                "input": {
+                    "intent": "agent startup probe with token verification",
+                    "required_privilege": "any_agent",
+                },
+                "decision": "agent_auth_health",
+            },
+            {
+                "input": {
+                    "intent": "platform-level probe with no agent token",
+                    "required_privilege": "none",
+                },
+                "decision": "service_healthz",
+            },
+        ],
+    },
+)
+def agent_healthz(
+    agent_ctx: AgentAuthContext = AGENT_CTX_DEP,
+) -> AgentHealthStatusResponse:
+    """Return authenticated liveness metadata for the current agent token."""
+    return AgentHealthStatusResponse(
+        ok=True,
+        agent_id=agent_ctx.agent.id,
+        board_id=agent_ctx.agent.board_id,
+        gateway_id=agent_ctx.agent.gateway_id,
+        status=agent_ctx.agent.status,
+        is_board_lead=agent_ctx.agent.is_board_lead,
+    )
 
 
 @router.get(

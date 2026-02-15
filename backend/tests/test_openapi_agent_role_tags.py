@@ -39,6 +39,8 @@ def test_openapi_agent_role_tags_are_exposed() -> None:
         path="/api/v1/agent/boards",
         method="get",
     )
+    health_tags = _op_tags(schema, path="/api/v1/agent/healthz", method="get")
+    assert {"agent-lead", "agent-worker", "agent-main"} <= health_tags
     assert "agent-main" in _op_tags(
         schema,
         path="/api/v1/agent/boards/{board_id}",
@@ -106,6 +108,7 @@ def test_openapi_agent_tool_endpoints_include_llm_hints() -> None:
 
     expected_paths = [
         ("/api/v1/agent/boards", "get"),
+        ("/api/v1/agent/healthz", "get"),
         ("/api/v1/agent/boards/{board_id}", "get"),
         ("/api/v1/agent/agents", "get"),
         ("/api/v1/agent/heartbeat", "post"),
