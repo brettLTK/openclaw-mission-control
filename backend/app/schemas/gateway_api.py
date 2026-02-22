@@ -22,6 +22,7 @@ class GatewayResolveQuery(SQLModel):
     gateway_url: str | None = None
     gateway_token: str | None = None
     gateway_disable_device_pairing: bool = False
+    gateway_allow_insecure_tls: bool = False
 
 
 class GatewaysStatusResponse(SQLModel):

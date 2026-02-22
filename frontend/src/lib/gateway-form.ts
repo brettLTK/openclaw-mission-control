@@ -25,15 +25,18 @@ export async function checkGatewayConnection(params: {
   gatewayUrl: string;
   gatewayToken: string;
   gatewayDisableDevicePairing: boolean;
+  gatewayAllowInsecureTls: boolean;
 }): Promise<{ ok: boolean; message: string }> {
   try {
     const requestParams: {
       gateway_url: string;
       gateway_token?: string;
       gateway_disable_device_pairing: boolean;
+      gateway_allow_insecure_tls: boolean;
     } = {
       gateway_url: params.gatewayUrl.trim(),
       gateway_disable_device_pairing: params.gatewayDisableDevicePairing,
+      gateway_allow_insecure_tls: params.gatewayAllowInsecureTls,
     };
     if (params.gatewayToken.trim()) {
       requestParams.gateway_token = params.gatewayToken.trim();

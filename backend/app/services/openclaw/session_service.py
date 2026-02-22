@@ -66,12 +66,14 @@ class GatewaySessionService(OpenClawDBService):
         gateway_url: str | None,
         gateway_token: str | None,
         gateway_disable_device_pairing: bool = False,
+        gateway_allow_insecure_tls: bool = False,
     ) -> GatewayResolveQuery:
         return GatewayResolveQuery(
             board_id=board_id,
             gateway_url=gateway_url,
             gateway_token=gateway_token,
             gateway_disable_device_pairing=gateway_disable_device_pairing,
+            gateway_allow_insecure_tls=gateway_allow_insecure_tls,
         )
 
     @staticmethod
@@ -112,6 +114,7 @@ class GatewaySessionService(OpenClawDBService):
                 GatewayClientConfig(
                     url=raw_url,
                     token=(params.gateway_token or "").strip() or None,
+                    allow_insecure_tls=params.gateway_allow_insecure_tls,
                     disable_device_pairing=params.gateway_disable_device_pairing,
                 ),
                 None,

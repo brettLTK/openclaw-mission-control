@@ -29,7 +29,7 @@ describe("checkGatewayConnection", () => {
     mockedGatewaysStatusApiV1GatewaysStatusGet.mockReset();
   });
 
-  it("passes pairing toggle to gateway status API", async () => {
+  it("passes pairing and TLS toggles to gateway status API", async () => {
     mockedGatewaysStatusApiV1GatewaysStatusGet.mockResolvedValue({
       status: 200,
       data: { connected: true },
@@ -39,12 +39,14 @@ describe("checkGatewayConnection", () => {
       gatewayUrl: "ws://gateway.example:18789",
       gatewayToken: "secret-token",
       gatewayDisableDevicePairing: true,
+      gatewayAllowInsecureTls: true,
     });
 
     expect(mockedGatewaysStatusApiV1GatewaysStatusGet).toHaveBeenCalledWith({
       gateway_url: "ws://gateway.example:18789",
       gateway_token: "secret-token",
       gateway_disable_device_pairing: true,
+      gateway_allow_insecure_tls: true,
     });
     expect(result).toEqual({ ok: true, message: "Gateway reachable." });
   });
@@ -62,6 +64,7 @@ describe("checkGatewayConnection", () => {
       gatewayUrl: "ws://gateway.example:18789",
       gatewayToken: "",
       gatewayDisableDevicePairing: false,
+      gatewayAllowInsecureTls: false,
     });
 
     expect(result).toEqual({ ok: false, message: "missing required scope" });

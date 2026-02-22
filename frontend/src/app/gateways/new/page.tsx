@@ -88,6 +88,7 @@ export default function NewGatewayPage() {
       gatewayUrl,
       gatewayToken,
       gatewayDisableDevicePairing: disableDevicePairing,
+      gatewayAllowInsecureTls: allowInsecureTls,
     });
     setGatewayCheckStatus(ok ? "success" : "error");
     setGatewayCheckMessage(message);
@@ -156,7 +157,11 @@ export default function NewGatewayPage() {
           setGatewayCheckMessage(null);
         }}
         onWorkspaceRootChange={setWorkspaceRoot}
-        onAllowInsecureTlsChange={setAllowInsecureTls}
+        onAllowInsecureTlsChange={(next) => {
+          setAllowInsecureTls(next);
+          setGatewayCheckStatus("idle");
+          setGatewayCheckMessage(null);
+        }}
       />
     </DashboardPageLayout>
   );
