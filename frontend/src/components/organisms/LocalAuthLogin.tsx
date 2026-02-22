@@ -8,37 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-const LOCAL_AUTH_TOKEN_MIN_LENGTH = 50;
-
-async function validateLocalToken(token: string): Promise<string | null> {
-  const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!rawBaseUrl) {
-    return "NEXT_PUBLIC_API_URL is not set.";
-  }
-
-  const baseUrl = rawBaseUrl.replace(/\/+$/, "");
-
-  let response: Response;
-  try {
-    response = await fetch(`${baseUrl}/api/v1/users/me`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  } catch {
-    return "Unable to reach backend to validate token.";
-  }
-
-  if (response.ok) {
-    return null;
-  }
-  if (response.status === 401 || response.status === 403) {
-    return "Token is invalid.";
-  }
-  return `Unable to validate token (HTTP ${response.status}).`;
-}
-
 type LocalAuthLoginProps = {
   onAuthenticated?: () => void;
 };
@@ -46,35 +15,56 @@ type LocalAuthLoginProps = {
 const defaultOnAuthenticated = () => window.location.reload();
 
 export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
-  const [token, setToken] = useState("");
+  const [passphrase, setPassphrase] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const cleaned = token.trim();
+    const cleaned = passphrase.trim();
     if (!cleaned) {
-      setError("Bearer token is required.");
-      return;
-    }
-    if (cleaned.length < LOCAL_AUTH_TOKEN_MIN_LENGTH) {
-      setError(
-        `Bearer token must be at least ${LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.`,
-      );
+      setError("Passphrase is required.");
       return;
     }
 
     setIsValidating(true);
-    const validationError = await validateLocalToken(cleaned);
-    setIsValidating(false);
-    if (validationError) {
-      setError(validationError);
+    setError(null);
+
+    const rawBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!rawBaseUrl) {
+      setError("NEXT_PUBLIC_API_URL is not set.");
+      setIsValidating(false);
       return;
     }
 
-    setLocalAuthToken(cleaned);
-    setError(null);
-    (onAuthenticated ?? defaultOnAuthenticated)();
+    const baseUrl = rawBaseUrl.replace(/\/+$/, "");
+
+    try {
+      const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ passphrase: cleaned }),
+      });
+
+      if (response.status === 200) {
+        const data = await response.json();
+        setLocalAuthToken(data.access_token);
+        (onAuthenticated ?? defaultOnAuthenticated)();
+        return;
+      }
+
+      if (response.status === 401) {
+        setError("Invalid passphrase.");
+      } else {
+        setError("Unable to reach backend.");
+      }
+    } catch {
+      setError("Unable to reach backend.");
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   return (
@@ -99,7 +89,7 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
               Local Authentication
             </h1>
             <p className="text-sm text-muted">
-              Enter your access token to unlock Mission Control.
+              Enter your passphrase to unlock Mission Control.
             </p>
           </div>
         </CardHeader>
@@ -107,29 +97,24 @@ export function LocalAuthLogin({ onAuthenticated }: LocalAuthLoginProps) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label
-                htmlFor="local-auth-token"
+                htmlFor="local-auth-passphrase"
                 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted"
               >
-                Access token
+                Passphrase
               </label>
               <Input
-                id="local-auth-token"
+                id="local-auth-passphrase"
                 type="password"
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-                placeholder="Paste token"
+                value={passphrase}
+                onChange={(event) => setPassphrase(event.target.value)}
+                placeholder="Enter passphrase"
                 autoFocus
                 disabled={isValidating}
-                className="font-mono"
               />
             </div>
-            {error ? (
+            {error && (
               <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {error}
-              </p>
-            ) : (
-              <p className="text-xs text-muted">
-                Token must be at least {LOCAL_AUTH_TOKEN_MIN_LENGTH} characters.
               </p>
             )}
             <Button
