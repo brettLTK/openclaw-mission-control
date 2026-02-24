@@ -2,7 +2,7 @@
 
 describe("/boards", () => {
   const apiBase = "**/api/v1";
-  const email = Cypress.env("CLERK_TEST_EMAIL") || "jane+clerk_test@example.com";
+  const email = "local-auth-user@example.com";
 
   const originalDefaultCommandTimeout = Cypress.config("defaultCommandTimeout");
 
@@ -14,9 +14,11 @@ describe("/boards", () => {
     Cypress.config("defaultCommandTimeout", originalDefaultCommandTimeout);
   });
 
-  it("auth negative: signed-out user is redirected to sign-in", () => {
+  it("auth negative: signed-out user is shown local auth login", () => {
     cy.visit("/boards");
-    cy.location("pathname", { timeout: 30_000 }).should("match", /\/sign-in/);
+    cy.contains("h1", /local authentication/i, { timeout: 30_000 }).should(
+      "be.visible",
+    );
   });
 
   it("happy path: signed-in user sees boards list", () => {
@@ -88,10 +90,7 @@ describe("/boards", () => {
       body: { items: [], total: 0, limit: 200, offset: 0 },
     }).as("boardGroups");
 
-    cy.visit("/sign-in");
-    cy.clerkLoaded();
-    cy.clerkSignIn({ strategy: "email_code", identifier: email });
-
+    cy.loginWithLocalAuth();
     cy.visit("/boards");
     cy.waitForAppLoaded();
 
