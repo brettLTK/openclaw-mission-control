@@ -77,6 +77,7 @@ class ApprovalUpdate(SQLModel):
     """Payload for mutating approval status."""
 
     status: ApprovalStatus | None = None
+    comment: str | None = None
 
     @model_validator(mode="after")
     def validate_status(self) -> Self:

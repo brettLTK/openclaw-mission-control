@@ -410,6 +410,11 @@ export function BoardApprovalsPanel({
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pendingDecision, setPendingDecision] = useState<{
+    approvalId: string;
+    status: "approved" | "rejected";
+    comment: string;
+  } | null>(null);
   const usingExternal = Array.isArray(externalApprovals);
   const approvalsKey = useMemo(
     () => getListApprovalsApiV1BoardsBoardIdApprovalsGetQueryKey(boardId),
@@ -448,7 +453,7 @@ export function BoardApprovalsPanel({
     : (error ?? approvalsQuery.error?.message ?? null);
 
   const handleDecision = useCallback(
-    (approvalId: string, status: "approved" | "rejected") => {
+    (approvalId: string, status: "approved" | "rejected", comment?: string) => {
       const pendingNext = [...approvals]
         .filter((item) => item.id !== approvalId)
         .filter((item) => item.status === "pending")
@@ -471,7 +476,7 @@ export function BoardApprovalsPanel({
       setError(null);
 
       updateApprovalMutation.mutate(
-        { boardId, approvalId, data: { status } },
+        { boardId, approvalId, data: { status, ...(comment ? { comment } : {}) } },
         {
           onSuccess: (result) => {
             if (result.status !== 200) return;
@@ -784,7 +789,11 @@ export function BoardApprovalsPanel({
                               variant="primary"
                               size="sm"
                               onClick={() =>
-                                handleDecision(selectedApproval.id, "approved")
+                                setPendingDecision({
+                                  approvalId: selectedApproval.id,
+                                  status: "approved",
+                                  comment: "",
+                                })
                               }
                               disabled={updatingId === selectedApproval.id}
                               className="bg-slate-900 text-white hover:bg-slate-800"
@@ -795,7 +804,11 @@ export function BoardApprovalsPanel({
                               variant="outline"
                               size="sm"
                               onClick={() =>
-                                handleDecision(selectedApproval.id, "rejected")
+                                setPendingDecision({
+                                  approvalId: selectedApproval.id,
+                                  status: "rejected",
+                                  comment: "",
+                                })
                               }
                               disabled={updatingId === selectedApproval.id}
                               className="border-slate-300 text-slate-700 hover:bg-slate-100"
@@ -806,6 +819,52 @@ export function BoardApprovalsPanel({
                         ) : null}
                       </div>
                     </div>
+
+                    {pendingDecision &&
+                    pendingDecision.approvalId === selectedApproval?.id ? (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <label className="block text-xs font-semibold text-slate-700 mb-2">
+                          Reason (required)
+                        </label>
+                        <textarea
+                          className="w-full border border-slate-300 rounded p-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          rows={3}
+                          value={pendingDecision.comment}
+                          onChange={(e) =>
+                            setPendingDecision((prev) =>
+                              prev ? { ...prev, comment: e.target.value } : null
+                            )
+                          }
+                          placeholder="Enter reason..."
+                          autoFocus
+                        />
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-500 text-white disabled:opacity-40"
+                            disabled={!pendingDecision.comment.trim()}
+                            onClick={() => {
+                              handleDecision(
+                                pendingDecision.approvalId,
+                                pendingDecision.status,
+                                pendingDecision.comment
+                              );
+                              setPendingDecision(null);
+                            }}
+                          >
+                            Confirm{" "}
+                            {pendingDecision.status === "approved"
+                              ? "Approve"
+                              : "Reject"}
+                          </button>
+                          <button
+                            className="px-3 py-1.5 text-xs font-semibold rounded bg-slate-200 text-slate-700"
+                            onClick={() => setPendingDecision(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
 
                     <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                       <StatusDot

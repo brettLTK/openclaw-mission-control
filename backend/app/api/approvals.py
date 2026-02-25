@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import asc, func, or_
 from sqlmodel import col, select
@@ -59,6 +62,48 @@ BOARD_WRITE_DEP = Depends(get_board_for_actor_write)
 BOARD_USER_WRITE_DEP = Depends(get_board_for_user_write)
 SESSION_DEP = Depends(get_session)
 ACTOR_DEP = Depends(require_admin_or_agent)
+
+
+async def post_github_decision_comment(
+    approval: Approval,
+    status: str,
+    comment: str,
+) -> None:
+    """Post approval decision to GitHub issue if available.
+
+    Parses issue number from approval.payload.get('title', '') using regex.
+    Posts comment to GitHub API if GITHUB_PAT is configured.
+    Silently returns on any error.
+    """
+    try:
+        github_pat = os.environ.get("GITHUB_PAT")
+        if not github_pat:
+            return
+
+        payload = approval.payload or {}
+        title = payload.get("title", "")
+        if not isinstance(title, str):
+            return
+
+        match = re.search(r"\[#(\d+)\]", title)
+        if not match:
+            return
+
+        issue_number = match.group(1)
+        status_upper = status.upper()
+        body = f"**[{status_upper}]** {comment}\n\n_Decision recorded in Mission Control_"
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(
+                f"https://api.github.com/repos/brettLTK/royalclaw-tasks/issues/{issue_number}/comments",
+                headers={
+                    "Authorization": f"Bearer {github_pat}",
+                    "Accept": "application/vnd.github.v3+json",
+                },
+                json={"body": body},
+            )
+    except Exception:
+        pass
 
 
 def _parse_since(value: str | None) -> datetime | None:
@@ -445,6 +490,13 @@ async def update_approval(
     if approval is None or approval.board_id != board.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     updates = payload.model_dump(exclude_unset=True)
+
+    if "comment" in updates:
+        comment_value = updates.pop("comment")
+        if comment_value is not None:
+            existing_payload = approval.payload or {}
+            approval.payload = {**existing_payload, "comment": comment_value}
+
     prior_status = approval.status
     if "status" in updates:
         target_status = updates["status"]
@@ -467,6 +519,11 @@ async def update_approval(
     session.add(approval)
     await session.commit()
     await session.refresh(approval)
+
+    decision_comment = None
+    if approval.payload:
+        decision_comment = approval.payload.get("comment")
+
     if approval.status in {"approved", "rejected"} and approval.status != prior_status:
         try:
             await _notify_lead_on_approval_resolution(
@@ -481,5 +538,15 @@ async def update_approval(
                 approval.id,
                 approval.status,
             )
+
+        if decision_comment and isinstance(decision_comment, str):
+            asyncio.create_task(
+                post_github_decision_comment(
+                    approval=approval,
+                    status=approval.status,
+                    comment=decision_comment,
+                )
+            )
+
     reads = await _approval_reads(session, [approval])
     return reads[0]
