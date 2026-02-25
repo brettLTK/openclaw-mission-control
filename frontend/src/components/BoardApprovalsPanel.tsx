@@ -364,10 +364,16 @@ const approvalSummary = (approval: Approval, boardLabel?: string | null) => {
   const reason =
     payloadValue(payload, "reason") ??
     payloadNestedValue(payload, ["decision", "reason"]);
+  const apiTaskTitles = (
+    approval as Approval & { task_titles?: string[] | null }
+  ).task_titles;
   const title =
     payloadValue(payload, "title") ??
     payloadNestedValue(payload, ["task", "title"]) ??
-    payloadFirstLinkedTaskValue(payload, "title");
+    payloadFirstLinkedTaskValue(payload, "title") ??
+    (Array.isArray(apiTaskTitles) && apiTaskTitles.length > 0
+      ? apiTaskTitles[0]
+      : null);
   const description =
     payloadValue(payload, "description") ??
     payloadNestedValue(payload, ["task", "description"]) ??
