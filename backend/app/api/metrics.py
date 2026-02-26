@@ -169,7 +169,7 @@ async def _query_throughput(
     bucket_col = func.date_trunc(range_spec.bucket, Task.updated_at).label("bucket")
     statement = (
         select(bucket_col, func.count())
-        .where(col(Task.status) == "review")
+        .where(col(Task.status) == "done")
         .where(col(Task.updated_at) >= range_spec.start)
         .where(col(Task.updated_at) <= range_spec.end)
     )
@@ -189,12 +189,11 @@ async def _query_cycle_time(
     board_ids: list[UUID],
 ) -> DashboardRangeSeries:
     bucket_col = func.date_trunc(range_spec.bucket, Task.updated_at).label("bucket")
-    in_progress = sql_cast(Task.in_progress_at, DateTime)
-    duration_hours = func.extract("epoch", Task.updated_at - in_progress) / 3600.0
+    created = sql_cast(Task.created_at, DateTime)
+    duration_hours = func.extract("epoch", Task.updated_at - created) / 3600.0
     statement = (
         select(bucket_col, func.avg(duration_hours))
-        .where(col(Task.status) == "review")
-        .where(col(Task.in_progress_at).is_not(None))
+        .where(col(Task.status) == "done")
         .where(col(Task.updated_at) >= range_spec.start)
         .where(col(Task.updated_at) <= range_spec.end)
     )
@@ -301,12 +300,11 @@ async def _median_cycle_time_for_range(
     range_spec: RangeSpec,
     board_ids: list[UUID],
 ) -> float | None:
-    in_progress = sql_cast(Task.in_progress_at, DateTime)
-    duration_hours = func.extract("epoch", Task.updated_at - in_progress) / 3600.0
+    created = sql_cast(Task.created_at, DateTime)
+    duration_hours = func.extract("epoch", Task.updated_at - created) / 3600.0
     statement = (
         select(func.percentile_cont(0.5).within_group(duration_hours))
-        .where(col(Task.status) == "review")
-        .where(col(Task.in_progress_at).is_not(None))
+        .where(col(Task.status) == "done")
         .where(col(Task.updated_at) >= range_spec.start)
         .where(col(Task.updated_at) <= range_spec.end)
     )
