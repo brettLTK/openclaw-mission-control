@@ -51,6 +51,7 @@ class TaskUpdate(SQLModel):
     assigned_agent_id: UUID | None = None
     depends_on_task_ids: list[UUID] | None = None
     tag_ids: list[UUID] | None = None
+    in_progress_at: datetime | None = None
     custom_field_values: TaskCustomFieldValues | None = None
     comment: NonEmptyStr | None = None
 
