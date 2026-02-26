@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { SignedIn, SignedOut, SignInButton, useAuth } from "@/auth/clerk";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,13 @@ import { BoardApprovalsPanel } from "@/components/BoardApprovalsPanel";
 import { DashboardSidebar } from "@/components/organisms/DashboardSidebar";
 import { DashboardShell } from "@/components/templates/DashboardShell";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type GlobalApprovalsData = {
   approvals: ApprovalRead[];
@@ -27,6 +34,7 @@ type GlobalApprovalsData = {
 function GlobalApprovalsInner() {
   const { isSignedIn } = useAuth();
   const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const boardsQuery = useListBoardsApiV1BoardsGet(undefined, {
     query: {
@@ -55,8 +63,8 @@ function GlobalApprovalsInner() {
   }, [boards]);
 
   const approvalsKey = useMemo(
-    () => ["approvals", "global", boardIdsKey] as const,
-    [boardIdsKey],
+    () => ["approvals", "global", boardIdsKey, statusFilter] as const,
+    [boardIdsKey, statusFilter],
   );
 
   const approvalsQuery = useQuery<GlobalApprovalsData, ApiError>({
@@ -68,9 +76,13 @@ function GlobalApprovalsInner() {
     queryFn: async () => {
       const results = await Promise.allSettled(
         boards.map(async (board) => {
+          const params: Record<string, any> = { limit: 200 };
+          if (statusFilter !== "all") {
+            params.status = statusFilter;
+          }
           const response = await listApprovalsApiV1BoardsBoardIdApprovalsGet(
             board.id,
-            { limit: 200 },
+            params,
             { cache: "no-store" },
           );
           if (response.status !== 200) {
@@ -168,7 +180,26 @@ function GlobalApprovalsInner() {
   return (
     <main className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="p-6">
-        <div className="h-[calc(100vh-160px)] min-h-[520px]">
+        <div className="mb-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-semibold text-slate-900">Approvals</h1>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-slate-700">Status:</span>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+        <div className="h-[calc(100vh-200px)] min-h-[520px]">
           <BoardApprovalsPanel
             boardId="global"
             approvals={approvals}
