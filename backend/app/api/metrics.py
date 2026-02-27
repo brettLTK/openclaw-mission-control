@@ -7,9 +7,7 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import DateTime, case
-from sqlalchemy import cast as sql_cast
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -179,7 +177,7 @@ async def _query_throughput(
         statement.where(col(Task.board_id).in_(board_ids)).group_by(bucket_col).order_by(bucket_col)
     )
     results = (await session.exec(statement)).all()
-    mapping = {row[0]: float(row[1]) for row in results}
+    mapping = {row[0].replace(tzinfo=None): float(row[1]) for row in results}
     return _series_from_mapping(range_spec, mapping)
 
 
@@ -189,11 +187,11 @@ async def _query_cycle_time(
     board_ids: list[UUID],
 ) -> DashboardRangeSeries:
     bucket_col = func.date_trunc(range_spec.bucket, Task.updated_at).label("bucket")
-    created = sql_cast(Task.created_at, DateTime)
-    duration_hours = func.extract("epoch", Task.updated_at - created) / 3600.0
+    duration_hours = func.extract("epoch", Task.updated_at - Task.in_progress_at) / 3600.0
     statement = (
         select(bucket_col, func.avg(duration_hours))
         .where(col(Task.status) == "done")
+        .where(Task.in_progress_at.is_not(None))  # type: ignore[union-attr]
         .where(col(Task.updated_at) >= range_spec.start)
         .where(col(Task.updated_at) <= range_spec.end)
     )
@@ -203,7 +201,7 @@ async def _query_cycle_time(
         statement.where(col(Task.board_id).in_(board_ids)).group_by(bucket_col).order_by(bucket_col)
     )
     results = (await session.exec(statement)).all()
-    mapping = {row[0]: float(row[1] or 0) for row in results}
+    mapping = {row[0].replace(tzinfo=None): float(row[1] or 0) for row in results}
     return _series_from_mapping(range_spec, mapping)
 
 
@@ -240,7 +238,7 @@ async def _query_error_rate(
         total_count = float(total or 0)
         error_count = float(errors or 0)
         rate = (error_count / total_count) * 100 if total_count > 0 else 0.0
-        mapping[bucket] = rate
+        mapping[bucket.replace(tzinfo=None)] = rate
     return _series_from_mapping(range_spec, mapping)
 
 
@@ -285,10 +283,10 @@ async def _query_wip(
 
     mapping: dict[datetime, dict[str, int]] = {}
     for bucket, inbox in inbox_results:
-        values = mapping.setdefault(bucket, {})
+        values = mapping.setdefault(bucket.replace(tzinfo=None), {})
         values["inbox"] = int(inbox or 0)
     for bucket, in_progress, review, done in status_results:
-        values = mapping.setdefault(bucket, {})
+        values = mapping.setdefault(bucket.replace(tzinfo=None), {})
         values["in_progress"] = int(in_progress or 0)
         values["review"] = int(review or 0)
         values["done"] = int(done or 0)
@@ -300,11 +298,11 @@ async def _median_cycle_time_for_range(
     range_spec: RangeSpec,
     board_ids: list[UUID],
 ) -> float | None:
-    created = sql_cast(Task.created_at, DateTime)
-    duration_hours = func.extract("epoch", Task.updated_at - created) / 3600.0
+    duration_hours = func.extract("epoch", Task.updated_at - Task.in_progress_at) / 3600.0
     statement = (
         select(func.percentile_cont(0.5).within_group(duration_hours))
         .where(col(Task.status) == "done")
+        .where(Task.in_progress_at.is_not(None))  # type: ignore[union-attr]
         .where(col(Task.updated_at) >= range_spec.start)
         .where(col(Task.updated_at) <= range_spec.end)
     )

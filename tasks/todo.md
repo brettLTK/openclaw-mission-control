@@ -1,30 +1,29 @@
-# Task: Required comment on MC approval decisions + GitHub Issues
+# Fix #62 — MC Dashboard Cycle Time + Timezone Bug
 
 ## Plan
 
-### Backend Changes
-- [ ] Update `backend/app/schemas/approvals.py` - Add `comment: str | None = None` to `ApprovalUpdate`
-- [ ] Create `post_github_decision_comment` helper in `backend/app/api/approvals.py`
-- [ ] Update `update_approval` in `backend/app/api/approvals.py` to:
-  - Merge comment into approval.payload
-  - Call GitHub comment helper after decision (non-blocking)
+### Fix A: Cycle time uses wrong field (metrics.py)
+- [x] In `_query_cycle_time()`: replace `created_at` → `in_progress_at`, add filter for non-null
+- [x] In `_median_cycle_time_for_range()`: same fix
+- [x] Remove unused `sql_cast` / `DateTime` imports if no longer needed
 
-### Frontend Changes
-- [ ] Update `BoardApprovalsPanel.tsx` to add inline reason form:
-  - Add state for comment textarea
-  - Show form before decision fires
-  - Disable approve/reject until comment is non-empty
-  - Include comment in PATCH request
+### Fix B: Timezone bug in series mapping (metrics.py)
+- [x] In `_query_throughput()`: strip tzinfo from bucket keys
+- [x] In `_query_cycle_time()`: same fix
+- [x] In `_query_error_rate()`: same fix
+- [x] In `_query_wip()`: same fix (both inbox and status bucket keys)
+
+### Fix C: Add `in_progress_at` to TaskUpdate schema
+- [x] Add `in_progress_at: datetime | None = None` to `TaskUpdate` in schemas/tasks.py
+
+### Fix D: Sync script — backfill `in_progress_at` from GitHub events
+- [x] Add `get_issue_events()` helper using `gh` CLI
+- [x] Add backfill pass: for each synced task without `in_progress_at`, query GH events for `status:in-progress` label event, PATCH MC task
 
 ### Verification
-- [ ] Run `npx next build` - must pass
-- [ ] Restart docker containers
-- [ ] Curl test PATCH approval with comment
-- [ ] Verify payload.comment stored
-- [ ] Fire openclaw event when complete
-
-## Approach
-1. Backend: Schema → GitHub helper → integrate into approval flow
-2. Frontend: Add inline form with required validation
-3. No DB migration needed (JSON payload)
-4. GitHub post is fire-and-forget with error handling
+- [x] Create feature branches
+- [x] Rebuild backend container
+- [x] Run sync script with `--force`
+- [x] Curl dashboard endpoint — confirm non-zero values
+- [x] Check DB for `in_progress_at` values
+- [ ] Commit both branches
