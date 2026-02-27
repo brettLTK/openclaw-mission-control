@@ -87,14 +87,16 @@ def _comparison_range(range_spec: RangeSpec) -> RangeSpec:
 
 
 def _bucket_start(value: datetime, bucket: DashboardBucketKey) -> datetime:
-    normalized = value.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Strip tzinfo so bucket keys are always naive — matching the .replace(tzinfo=None)
+    # applied to DB results in each query's mapping dict.
+    normalized = value.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
     if bucket == "month":
         return normalized.replace(day=1)
     if bucket == "week":
         return normalized - timedelta(days=normalized.weekday())
     if bucket == "day":
         return normalized
-    return value.replace(minute=0, second=0, microsecond=0)
+    return value.replace(minute=0, second=0, microsecond=0, tzinfo=None)
 
 
 def _next_bucket(cursor: datetime, bucket: DashboardBucketKey) -> datetime:
