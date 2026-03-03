@@ -21,7 +21,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Activity, PenSquare, Timer, Users } from "lucide-react";
+import { Activity, PenSquare, Timer, Users, Zap, Ban } from "lucide-react";
 
 import { DashboardSidebar } from "@/components/organisms/DashboardSidebar";
 import { DashboardShell } from "@/components/templates/DashboardShell";
@@ -550,7 +550,7 @@ export default function DashboardPage() {
 
             {metrics ? (
               <>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                   <KpiCard
                     label="Active agents"
                     value={formatNumber(metrics.kpis.active_agents)}
@@ -575,6 +575,18 @@ export default function DashboardPage() {
                     icon={<Timer className="h-4 w-4" />}
                     progress={cycleProgress}
                   />
+                  {/* TODO: Add back once API types are updated
+                  <KpiCard
+                    label="High voltage tasks"
+                    value={formatNumber(metrics.kpis.high_voltage_tasks)}
+                    icon={<Zap className="h-4 w-4" />}
+                  />
+                  <KpiCard
+                    label="Blocked tasks"
+                    value={formatNumber(metrics.kpis.blocked_tasks)}
+                    icon={<Ban className="h-4 w-4" />}
+                  />
+                  */}
                 </div>
 
                 <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">

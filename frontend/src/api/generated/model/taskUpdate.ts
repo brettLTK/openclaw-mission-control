@@ -18,6 +18,7 @@ export interface TaskUpdate {
   assigned_agent_id?: string | null;
   depends_on_task_ids?: string[] | null;
   tag_ids?: string[] | null;
+  in_progress_at?: string | null;
   custom_field_values?: TaskUpdateCustomFieldValues;
   comment?: string | null;
 }

@@ -160,6 +160,8 @@ export * from "./listTasksApiV1AgentBoardsBoardIdTasksGetParams";
 export * from "./listTasksApiV1BoardsBoardIdTasksGetParams";
 export * from "./lLMErrorResponse";
 export * from "./lLMErrorResponseDetail";
+export * from "./loginRequest";
+export * from "./loginResponse";
 export * from "./marketplaceSkillActionResponse";
 export * from "./marketplaceSkillCardRead";
 export * from "./marketplaceSkillCardReadMetadata";

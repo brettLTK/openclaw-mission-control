@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import case, func
+from sqlalchemy import String, case, func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -29,6 +29,7 @@ from app.schemas.metrics import (
     DashboardWipPoint,
     DashboardWipRangeSeries,
     DashboardWipSeriesSet,
+    BlockedTaskSummary,
 )
 from app.services.organizations import OrganizationContext, list_accessible_board_ids
 
@@ -351,6 +352,56 @@ async def _error_rate_kpi(
     return (error_count / total_count) * 100 if total_count > 0 else 0.0
 
 
+async def _high_voltage_tasks(
+    session: AsyncSession,
+    range_spec: RangeSpec,
+    board_ids: list[UUID],
+) -> int:
+    """Count tasks with custom_field_values.voltage_level = "high" across all boards."""
+    if not board_ids:
+        return 0
+    
+    from app.models.task_custom_fields import TaskCustomFieldValue, TaskCustomFieldDefinition
+    
+    statement = (
+        select(func.count())
+        .select_from(Task)
+        .join(TaskCustomFieldValue, col(Task.id) == col(TaskCustomFieldValue.task_id))
+        .join(TaskCustomFieldDefinition, col(TaskCustomFieldValue.task_custom_field_definition_id) == col(TaskCustomFieldDefinition.id))
+        .where(col(Task.board_id).in_(board_ids))
+        .where(col(TaskCustomFieldDefinition.field_key) == "voltage_level")
+        .where(col(TaskCustomFieldValue.value).cast(String) == '"high"')
+    )
+    result = (await session.exec(statement)).one()
+    return int(result)
+
+
+async def _blocked_tasks(
+    session: AsyncSession,
+    range_spec: RangeSpec,
+    board_ids: list[UUID],
+) -> int:
+    """Count non-done tasks that have at least one unresolved dependency."""
+    if not board_ids:
+        return 0
+    from app.models.task_dependencies import TaskDependency
+    # Subquery: task IDs that have a dependency on a non-done task
+    blocking_sq = (
+        select(TaskDependency.task_id)
+        .join(Task, Task.id == TaskDependency.depends_on_task_id)
+        .where(Task.status != "done")
+        .subquery()
+    )
+    statement = (
+        select(func.count())
+        .where(col(Task.board_id).in_(board_ids))
+        .where(col(Task.status) != "done")
+        .where(col(Task.id).in_(select(blocking_sq.c.task_id)))
+    )
+    result = (await session.exec(statement)).one()
+    return int(result)
+
+
 async def _active_agents(
     session: AsyncSession,
     range_spec: RangeSpec,
@@ -469,6 +520,8 @@ async def dashboard_metrics(
             primary,
             board_ids,
         ),
+        high_voltage_tasks=await _high_voltage_tasks(session, primary, board_ids),
+        blocked_tasks=await _blocked_tasks(session, primary, board_ids),
     )
 
     return DashboardMetrics(
@@ -480,3 +533,58 @@ async def dashboard_metrics(
         error_rate=error_rate,
         wip=wip,
     )
+
+
+@router.get("/blocked-tasks", response_model=list[BlockedTaskSummary])
+async def blocked_tasks(
+    board_id: UUID | None = BOARD_ID_QUERY,
+    group_id: UUID | None = GROUP_ID_QUERY,
+    session: AsyncSession = SESSION_DEP,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> list[BlockedTaskSummary]:
+    """Return top 5 blocked tasks for accessible boards."""
+    board_ids = await _resolve_dashboard_board_ids(
+        session,
+        ctx=ctx,
+        board_id=board_id,
+        group_id=group_id,
+    )
+    
+    if not board_ids:
+        return []
+    
+    from app.models.task_dependencies import TaskDependency
+    blocking_sq = (
+        select(TaskDependency.task_id)
+        .join(Task, Task.id == TaskDependency.depends_on_task_id)
+        .where(Task.status != "done")
+        .subquery()
+    )
+    statement = (
+        select(
+            col(Task.id).label("id"),
+            col(Task.title),
+            col(Task.created_at),
+            col(Board.name).label("board_name"),
+        )
+        .join(Board, col(Task.board_id) == col(Board.id))
+        .where(col(Task.board_id).in_(board_ids))
+        .where(col(Task.status) != "done")
+        .where(col(Task.id).in_(select(blocking_sq.c.task_id)))
+        .order_by(col(Task.created_at).desc())
+        .limit(5)
+    )
+    
+    results = await session.exec(statement)
+    blocked_tasks = []
+    for task_id, title, created_at, board_name in results:
+        blocked_tasks.append(
+            BlockedTaskSummary(
+                id=str(task_id),
+                title=title,
+                board_name=board_name,
+                created_at=created_at,
+            )
+        )
+    
+    return blocked_tasks

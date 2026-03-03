@@ -66,7 +66,18 @@ class DashboardKpis(SQLModel):
     tasks_in_progress: int
     error_rate_pct: float
     median_cycle_time_hours_7d: float | None
+    high_voltage_tasks: int
+    blocked_tasks: int
 
+
+class BlockedTaskSummary(SQLModel):
+    """Summary of a blocked task for dashboard display."""
+    
+    id: str
+    title: str
+    board_name: str
+    created_at: datetime
+    
 
 class DashboardMetrics(SQLModel):
     """Complete dashboard metrics response payload."""

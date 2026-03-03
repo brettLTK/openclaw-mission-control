@@ -10,4 +10,5 @@
  */
 export interface ApprovalUpdate {
   status?: "pending" | "approved" | "rejected" | null;
+  comment?: string | null;
 }

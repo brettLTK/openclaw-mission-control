@@ -24,6 +24,7 @@ from app.api.deps import (
     require_admin_or_agent,
 )
 from app.core.time import utcnow
+from app.core.logging import get_logger
 from app.db import crud
 from app.db.pagination import paginate
 from app.db.session import async_session_maker, get_session
@@ -60,6 +61,7 @@ from app.services.mentions import extract_mentions, matches_agent_mention
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
 from app.services.openclaw.gateway_rpc import GatewayConfig as GatewayClientConfig
 from app.services.openclaw.gateway_rpc import OpenClawGatewayError
+from app.services.github_integration import notify_github_task_done
 from app.services.organizations import require_board_access
 from app.services.tags import (
     TagState,
@@ -87,6 +89,7 @@ if TYPE_CHECKING:
     from app.models.users import User
 
 router = APIRouter(prefix="/boards/{board_id}/tasks", tags=["tasks"])
+logger = get_logger(__name__)
 
 ALLOWED_STATUSES = {"inbox", "in_progress", "review", "done"}
 TASK_EVENT_TYPES = {
@@ -2648,6 +2651,15 @@ async def _finalize_updated_task(
     await _record_task_comment_from_update(session, update=update)
     await _record_task_update_activity(session, update=update)
     await _notify_task_update_assignment_changes(session, update=update)
+    
+    # Notify GitHub if task status changed to "done"
+    if (update.previous_status != "done" and update.task.status == "done" 
+        and update.task.title):
+        try:
+            await notify_github_task_done(update.task.title)
+        except Exception as e:
+            # Log error but don't fail the task update
+            logger.error(f"Failed to notify GitHub for task {update.task.id}: {str(e)}")
 
     return await _task_read_response(
         session,

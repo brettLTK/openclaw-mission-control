@@ -69,6 +69,9 @@ class Settings(BaseSettings):
 
     # OpenClaw gateway runtime compatibility
     gateway_min_version: str = "2026.02.9"
+    
+    # GitHub API integration
+    github_pat: str = ""
 
     # Logging
     log_level: str = "INFO"
