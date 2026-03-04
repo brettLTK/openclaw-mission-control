@@ -44,6 +44,7 @@ services:
       LOCAL_AUTH_TOKEN: ${LOCAL_AUTH_TOKEN}
       LOGIN_PASSPHRASE_HASH: ${LOGIN_PASSPHRASE_HASH}
       RQ_REDIS_URL: redis://redis:6379/0
+      GITHUB_PAT: ${GITHUB_PAT}
     depends_on:
       db:
         condition: service_healthy

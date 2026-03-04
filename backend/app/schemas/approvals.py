@@ -94,5 +94,13 @@ class ApprovalRead(ApprovalBase):
     board_id: UUID
     task_titles: list[str] = Field(default_factory=list)
     agent_id: UUID | None = None
+    comment: str | None = None
     created_at: datetime
     resolved_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def _extract_comment_from_payload(self) -> "ApprovalRead":
+        """Extract comment from payload dict if not explicitly set."""
+        if self.comment is None and isinstance(self.payload, dict):
+            self.comment = self.payload.get("comment") or None
+        return self

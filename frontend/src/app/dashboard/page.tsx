@@ -575,18 +575,16 @@ export default function DashboardPage() {
                     icon={<Timer className="h-4 w-4" />}
                     progress={cycleProgress}
                   />
-                  {/* TODO: Add back once API types are updated
                   <KpiCard
                     label="High voltage tasks"
-                    value={formatNumber(metrics.kpis.high_voltage_tasks)}
+                    value={formatNumber(metrics.kpis.high_voltage_tasks ?? 0)}
                     icon={<Zap className="h-4 w-4" />}
                   />
                   <KpiCard
                     label="Blocked tasks"
-                    value={formatNumber(metrics.kpis.blocked_tasks)}
+                    value={formatNumber(metrics.kpis.blocked_tasks ?? 0)}
                     icon={<Ban className="h-4 w-4" />}
                   />
-                  */}
                 </div>
 
                 <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">

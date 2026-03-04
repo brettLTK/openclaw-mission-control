@@ -27,6 +27,7 @@ export interface ApprovalRead {
   board_id: string;
   task_titles?: string[];
   agent_id?: string | null;
+  comment?: string | null;
   created_at: string;
   resolved_at?: string | null;
 }

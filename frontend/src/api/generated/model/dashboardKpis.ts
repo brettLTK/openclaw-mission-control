@@ -13,4 +13,6 @@ export interface DashboardKpis {
   tasks_in_progress: number;
   error_rate_pct: number;
   median_cycle_time_hours_7d: number | null;
+  high_voltage_tasks: number;
+  blocked_tasks: number;
 }
