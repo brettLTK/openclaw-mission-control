@@ -46,7 +46,7 @@ type BoardApprovalsPanelProps = {
   approvals?: ApprovalRead[];
   isLoading?: boolean;
   error?: string | null;
-  onDecision?: (approvalId: string, status: "approved" | "rejected") => void;
+  onDecision?: (approvalId: string, status: "approved" | "rejected", comment?: string) => void;
   scrollable?: boolean;
   boardLabelById?: Record<string, string>;
 };
@@ -467,7 +467,7 @@ export function BoardApprovalsPanel({
       }
 
       if (onDecision) {
-        onDecision(approvalId, status);
+        onDecision(approvalId, status, comment);
         return;
       }
       if (usingExternal) return;
@@ -885,7 +885,6 @@ export function BoardApprovalsPanel({
                       </div>
                     </div>
 
-                    {/* TODO: Add back once ApprovalRead type includes comment field
                     {selectedApproval.comment?.trim() ? (
                       <div className="space-y-2">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
@@ -896,7 +895,6 @@ export function BoardApprovalsPanel({
                         </div>
                       </div>
                     ) : null}
-                    */}
 
                     {titleText ? (
                       <div className="space-y-2">

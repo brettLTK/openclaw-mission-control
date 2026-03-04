@@ -116,13 +116,13 @@ function GlobalApprovalsInner() {
       >
     >,
     ApiError,
-    { boardId: string; approvalId: string; status: "approved" | "rejected" }
+    { boardId: string; approvalId: string; status: "approved" | "rejected"; comment?: string }
   >({
-    mutationFn: ({ boardId, approvalId, status }) =>
+    mutationFn: ({ boardId, approvalId, status, comment }) =>
       updateApprovalApiV1BoardsBoardIdApprovalsApprovalIdPatch(
         boardId,
         approvalId,
-        { status },
+        { status, ...(comment ? { comment } : {}) },
         { cache: "no-store" },
       ),
   });
@@ -138,13 +138,13 @@ function GlobalApprovalsInner() {
   const errorText = approvalsQuery.error?.message ?? null;
 
   const handleDecision = useCallback(
-    (approvalId: string, status: "approved" | "rejected") => {
+    (approvalId: string, status: "approved" | "rejected", comment?: string) => {
       const approval = approvals.find((item) => item.id === approvalId);
       const boardId = approval?.board_id;
       if (!boardId) return;
 
       updateApprovalMutation.mutate(
-        { boardId, approvalId, status },
+        { boardId, approvalId, status, ...(comment ? { comment } : {}) },
         {
           onSuccess: (result) => {
             if (result.status !== 200) return;
